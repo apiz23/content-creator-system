@@ -1,0 +1,988 @@
+```
+# AGENTS.md
+
+## Project: Creator Research
+
+### Purpose
+
+This project is used to discover, research, analyze, validate, and organize publicly available information about content creators.
+
+The primary focus is creators related to:
+
+- Artificial Intelligence
+- Generative AI
+- AI Video
+- AI Image Generation
+- AI Tools
+- Software Development
+- Technology
+- Developer Tools
+- Content Creation
+
+The project uses Hermes as the AI agent, DeepSeek as the primary reasoning/coding model, Python for scraping and data processing, and Obsidian as the knowledge base.
+
+---
+
+# 1. CRITICAL RULES
+
+These rules override all other instructions. Never violate them.
+
+## 1.1 Never Destroy Master Data
+
+The following files are MASTER DATA and must NEVER be deleted, replaced, overwritten destructively, truncated, or recreated from only the latest search/discovery results:
+
+1. `data/Creator-Intel-CRM-List.csv`
+2. `data/input/input_channels.csv`
+
+Default behavior is ALWAYS:
+
+```
+PRESERVE EXISTING DATA → DEDUPLICATE → APPEND NEW DATA → VERIFY
+```
+
+## 1.2 Never Fabricate
+
+Never guess or invent:
+
+- Creator names, usernames, handles
+- Follower counts, email addresses
+- Locations, languages, AI tools
+- Profile URLs, sample content URLs
+- Engagement metrics
+
+Use `Unknown` when information cannot be verified.
+
+## 1.3 Never Claim Completion Without Verification
+
+Never say "complete" until ALL required steps have been verified. If a step fails, report the failure instead of claiming success.
+
+## 1.4 Discovery ≠ Scraping
+
+- **Discovery** finds new creators and adds them to the input queue. It does NOT run scrapers.
+- **Scraping** reads the input queue, runs scrapers, and saves output. It does NOT perform web discovery.
+
+Only combine them when the user explicitly asks for both.
+
+---
+
+# 2. AUTHORITATIVE FILES
+
+| File | Purpose | Can Replace? |
+|------|---------|--------------|
+| `data/input/input_channels.csv` | Persistent scraping queue | ❌ Never |
+| `data/Creator-Intel-CRM-List.csv` | Master CRM database | ❌ Never |
+| `data/output/*_scraped_output.csv` | Latest scraper output | ✅ Can refresh |
+| `data/output/creator_discovery.csv` | Optional discovery report | ✅ Can refresh |
+| `obsidian/Creator Research/` | Knowledge base | ❌ Preserve existing research |
+
+## 2.1 input_channels.csv
+
+Purpose: Persistent scraping queue.
+
+Rules:
+- APPEND new verified creators
+- DO NOT replace with only new discoveries
+- DO NOT remove existing records
+- Preserve existing columns and their order
+- Deduplicate before appending
+
+## 2.2 Creator-Intel-CRM-List.csv
+
+Purpose: Master CRM database.
+
+Rules:
+- APPEND new records
+- UPDATE existing records only when new verified information is available
+- DO NOT replace with platform output
+- DO NOT delete existing creators unless user explicitly requests
+- Preserve existing schema and column order
+
+## 2.3 Platform Output CSVs
+
+Purpose: Latest scraper result. Intermediate outputs, NOT master database.
+
+After scraping, merge/update into the Master CRM.
+
+## 2.4 creator_discovery.csv
+
+Purpose: Optional reporting artifact only. NOT authoritative.
+
+Must NEVER replace:
+- `data/input/input_channels.csv`
+- `data/Creator-Intel-CRM-List.csv`
+
+---
+
+# 3. DISCOVERY WORKFLOW
+
+When the user asks to discover/find/search for new creators:
+
+```
+SEARCH
+    ↓
+VERIFY CREATOR
+    ↓
+VERIFY PROFILE URL
+    ↓
+CHECK FOR DUPLICATE (input CSV + Master CRM + Obsidian)
+    ↓
+APPEND TO data/input/input_channels.csv
+    ↓
+APPEND/UPDATE data/Creator-Intel-CRM-List.csv
+    ↓
+CREATE/UPDATE Obsidian CREATOR NOTE
+    ↓
+UPDATE PLATFORM NOTE
+    ↓
+UPDATE DAILY LOG
+    ↓
+CHECK PROJECT/RESEARCH IF RELEVANT
+    ↓
+VERIFY EVERYTHING
+    ↓
+REPORT COMPLETE
+```
+
+## 3.1 Discovery Triggers
+
+Perform discovery ONLY when the user explicitly asks to:
+
+- discover a creator
+- find creators / find new creators
+- search for creators
+- find TikTok creators / find AI creators
+- discover new profiles
+- add creators to the input CSV
+
+Do NOT automatically discover during a normal scrape.
+
+## 3.2 Discovery Source
+
+Discovery may use:
+
+- Web search
+- Public platform search
+- Public creator directories
+- Other publicly available sources
+
+## 3.3 New Creator Count
+
+When the user requests N NEW creators (e.g., "Find 5 new TikTok creators"):
+
+- N means N genuinely new, verified, deduplicated creators
+- Existing creators and duplicates do NOT count toward N
+- Continue discovery until N qualifying new creators are found
+- Report: candidates reviewed, duplicates skipped, rejected candidates, genuinely new creators added
+
+## 3.4 Duplicate Protection
+
+Before adding a discovered creator:
+
+1. Compare ProfileURL
+2. Compare normalized handle
+3. Search the Creators folder
+4. Check the input CSV
+5. Check the Master Creator CRM
+
+If the creator already exists:
+
+- Do not add another CSV row
+- Do not add another CRM row
+- Update existing Obsidian information if appropriate
+- Update existing CRM information if appropriate
+- Report that the creator already existed
+
+## 3.5 Discovery → Input CSV
+
+When a creator is discovered and verified:
+
+1. Read the existing CSV
+2. Check whether the creator/profile URL already exists
+3. Preserve the existing CSV schema
+4. Append the new creator as a new row
+5. Verify that the CSV remains valid
+6. Do not automatically scrape the creator
+
+## 3.6 Discovery → Master CRM
+
+When a creator is discovered and verified:
+
+1. Read the existing Master CRM
+2. Identify the creator using the strongest available identifier:
+   - ProfileURL
+   - Platform + normalized handle
+   - Creator name where appropriate
+3. Check for duplicates
+4. If the creator already exists → UPDATE the existing row
+5. If the creator does not exist → APPEND a new row
+6. Preserve existing useful information
+7. Never fabricate missing values
+
+## 3.7 Discovery → Obsidian
+
+After discovering a creator, create/update:
+
+- `obsidian/Creator Research/Creators/<handle>.md`
+- `obsidian/Creator Research/Platforms/<Platform>.md`
+- `obsidian/Creator Research/Daily/YYYY-MM-DD.md`
+- Check relevant Projects and Research if applicable
+
+Clearly distinguish DISCOVERED information from SCRAPED information.
+
+Do NOT present discovered information as scraped information.
+
+## 3.8 Discovery Completion
+
+Do not say discovery is complete until:
+
+- [ ] Creator discovered
+- [ ] Profile URL verified
+- [ ] Duplicate check completed
+- [ ] Input CSV updated
+- [ ] Master Creator CRM updated
+- [ ] Creator Obsidian note created/updated
+- [ ] Platform note updated
+- [ ] Daily log updated
+- [ ] Relevant Project checked
+- [ ] Relevant Research checked
+- [ ] Changes verified
+
+## 3.9 Discovery Example
+
+User: "Find 1 TikTok creator who makes AI content."
+
+Expected workflow:
+
+```
+Web Search
+    ↓
+Find suitable creator
+    ↓
+Verify TikTok URL
+    ↓
+Check input CSV
+    ↓
+Check Master CRM
+    ↓
+Append to input_channels.csv
+    ↓
+Append to Creator-Intel-CRM-List.csv
+    ↓
+Create/update Creator note
+    ↓
+Update TikTok platform note
+    ↓
+Update today's Daily note
+    ↓
+Check Projects/Research
+    ↓
+Verify
+    ↓
+Report
+```
+
+Expected response:
+
+```
+Discovery complete.
+
+- Creator: @example
+- Platform: TikTok
+- Profile: verified
+- Added to: data/input/input_channels.csv
+- Added to: data/Creator-Intel-CRM-List.csv
+- Creator note: created/updated
+- Platform note: Platforms/TikTok.md updated
+- Daily log: Daily/2026-09-01.md updated
+- Scraping: NOT performed
+```
+
+---
+
+# 4. SCRAPING WORKFLOW
+
+When the user asks to "scrape", "scrape [platform]", "run the scraper", or "refresh creator data":
+
+```
+READ INPUT CSV
+    ↓
+FILTER REQUESTED PLATFORM
+    ↓
+RUN SCRAPER
+    ↓
+SAVE CSV TO data/output/
+    ↓
+VERIFY CSV
+    ↓
+UPDATE MASTER CRM
+    ↓
+SYNC CREATOR NOTES
+    ↓
+SYNC PLATFORM NOTE
+    ↓
+SYNC DAILY LOG
+    ↓
+CHECK PROJECT/RESEARCH
+    ↓
+VERIFY EVERYTHING
+    ↓
+REPORT COMPLETE
+```
+
+## 4.1 Scrape Triggers
+
+Scrape ONLY when the user explicitly asks to:
+
+- scrape
+- run the scraper
+- scrape TikTok / scrape Facebook / scrape Threads
+- scrape all platforms
+- refresh creator data
+
+Do NOT perform web discovery during a scrape.
+
+## 4.2 Scrape Input
+
+The input CSV is the source of truth for scraping.
+
+1. Read `data/input/input_channels.csv`
+2. Filter by the requested platform
+3. Never invent creator URLs for scrape operations
+4. Never use web search for scraper input
+
+## 4.3 Platform Routing
+
+- Threads → `Code/scraper/threads.py`
+- TikTok → `Code/scraper/tiktok.py`
+- Instagram → `Code/scraper/instagram.py`
+- Facebook → `Code/scraper/facebook.py`
+- LinkedIn → `Code/scraper/linkedin.py`
+- Reddit → `Code/scraper/reddit.py`
+- YouTube → `Code/scraper/main.py`
+- Vimeo → `Code/scraper/vimeo.py`
+- Civitai → `Code/scraper/civitai.py`
+
+## 4.4 Scrape Output
+
+Save scraped results to `data/output/` using platform-specific filenames:
+
+- `threads_scraped_output.csv`
+- `tiktok_scraped_output.csv`
+- `instagram_scraped_output.csv`
+- `facebook_scraped_output.csv`
+- `linkedin_scraped_output.csv`
+- `reddit_scraped_output.csv`
+- `youtube_refreshed_output.csv`
+- `vimeo_scraped_output.csv`
+- `civitai_scraped_output.csv`
+
+Platform outputs are intermediate, not the master database. Merge/update into Master CRM after scraping.
+
+## 4.5 Scrape → CRM Update
+
+After scraping a creator, ALWAYS update the corresponding record in:
+
+`data/Creator-Intel-CRM-List.csv`
+
+For every creator in the output:
+
+1. Check if creator exists in Master CRM
+2. If exists → UPDATE the existing row with new verified information
+3. If not exists → APPEND a new row
+4. Never replace the entire CRM with scraper output
+5. Never blank existing fields because scraper returned empty
+6. Never replace verified data with Unknown
+
+## 4.6 Scrape → Obsidian Sync
+
+After EVERY successful scraping run:
+
+### Creator Notes (`obsidian/Creator Research/Creators/`)
+
+For EVERY successfully scraped creator:
+
+1. Search for an existing note
+2. If exists → UPDATE it
+3. If not exists → CREATE it
+4. Never create duplicate notes
+5. Preserve existing verified information
+6. Record source/evidence URLs
+7. Record scrape/update date
+
+### Platform Note (`obsidian/Creator Research/Platforms/`)
+
+Update the platform note with:
+
+- Platform name
+- Latest scrape date
+- Number of profiles processed
+- Number successfully scraped
+- Number failed
+- Relevant creator links (using wikilinks)
+- Scraping limitations
+- Important findings
+
+### Daily Log (`obsidian/Creator Research/Daily/`)
+
+Create/update `Daily/YYYY-MM-DD.md` with:
+
+- Date
+- Platform scraped
+- Input/output files
+- Records processed, succeeded, failed
+- New creators / existing creators updated
+- Obsidian notes created/updated
+- Errors encountered
+
+### Projects and Research
+
+- Update Projects only when associated with an existing project
+- Update Research only when scrape produces meaningful research findings
+- Do NOT create unnecessary project notes
+
+## 4.7 Scrape Completion
+
+The word "complete" MUST NOT be used until:
+
+- [ ] Scraper finished
+- [ ] CSV saved to `data/output/`
+- [ ] CSV verified
+- [ ] Master Creator CRM updated
+- [ ] Creator notes synchronized
+- [ ] Platform note synchronized
+- [ ] Daily log synchronized
+- [ ] Relevant Project notes checked
+- [ ] Relevant Research notes checked
+
+If any step fails, report exactly what failed and continue fixing it where possible.
+
+## 4.8 Scrape Report
+
+After every scraper execution, report:
+
+- Platform scraped
+- Scraper executed
+- Input file
+- Output file
+- Records found in input
+- Records successfully scraped
+- Records failed
+- Obsidian notes created/updated
+- Daily log created/updated
+- Overall status: `SUCCESS`, `PARTIALLY COMPLETED`, or `FAILED`
+
+## 4.9 Simple Scrape Command
+
+User: `scrape Facebook`
+
+Hermes MUST:
+
+1. Read `data/input/input_channels.csv`
+2. Find Facebook profiles
+3. Run Facebook scraper
+4. Save `data/output/facebook_scraped_output.csv`
+5. Verify results
+6. Update Master Creator CRM
+7. Update/create Facebook creator notes
+8. Update `Platforms/Facebook.md`
+9. Update `Daily/YYYY-MM-DD.md`
+10. Check relevant Projects/Research
+11. Verify synchronization
+12. Report completion
+
+The user should NOT have to say "scrape Facebook and update Obsidian" or "scrape Facebook and update the CRM" because both are already mandatory.
+
+## 4.10 Existing Output Files
+
+If the requested scraper discovers that an output CSV already exists:
+
+- DO NOT automatically assume it represents the current run
+- Check: file modification time, scraper execution result, number of records
+- If the current scrape was not actually executed, clearly state that
+- If the user explicitly asks to refresh/re-scrape, run the scraper
+
+## 4.11 Obsidian Creator Note Structure
+
+Use this structure for creator notes:
+
+```markdown
+---
+name:
+handle:
+platform:
+profile_url:
+followers:
+email:
+category:
+language:
+region:
+ai_tools:
+status:
+discovered_at:
+last_scraped_at:
+last_verified:
+---
+
+# Creator Name
+
+## Profile
+
+## Content
+
+## AI / Technology
+
+## AI Tools
+
+## Evidence
+
+## Analysis
+
+## Notes
+
+## Related
+```
+
+Only populate fields supported by available evidence. Use `Unknown` when information cannot be verified.
+
+## 4.12 Data Priority
+
+When information exists in multiple places, prefer the newest verified information:
+
+```
+CURRENT VERIFIED SCRAPE
+    ↓
+PREVIOUS VERIFIED SCRAPE
+    ↓
+DISCOVERY DATA
+    ↓
+OLD EXISTING DATA
+```
+
+Never overwrite reliable existing information with empty or failed scrape results. If a new scrape fails to retrieve follower count, DO NOT replace an existing verified follower count with "N/A".
+
+---
+
+# 5. MASTER CSV SAFETY
+
+## 5.1 Safe Write Procedure
+
+Before modifying a master CSV:
+
+1. Check that the file exists
+2. Read the current contents
+3. Record the current row count
+4. Create an in-memory copy of the existing dataset
+5. Apply the intended append/update operation
+6. Validate the resulting dataset
+7. Write the updated dataset safely
+8. Re-read the saved file
+9. Verify:
+   - Previous row count
+   - Existing record identifiers still present
+   - New records added
+   - Column names unchanged
+   - Column order unchanged
+   - No unexpected rows deleted
+10. Report: Previous row count, new creators discovered, duplicates skipped, records added, final row count
+
+If validation fails, DO NOT overwrite the original file. Preserve the original and report the failure.
+
+## 5.2 Append, Don't Replace
+
+FORBIDDEN behavior:
+
+```text
+Existing CSV: 100 creators
+New search: 5 creators
+
+WRONG: Replace CSV → 5 creators
+
+CORRECT: 100 existing + 5 genuinely new → 105 creators
+
+If 2 of the 5 are already present:
+100 existing + 3 genuinely new → 103 creators
+```
+
+## 5.3 Safety Check
+
+If there is ANY uncertainty about whether an operation will replace or destroy existing data:
+
+STOP before writing and ask the user for confirmation.
+
+Do NOT assume that "update", "sync", "refresh", "save", "rebuild", or "regenerate" means replacing the dataset.
+
+## 5.4 Deletion Policy
+
+Never delete existing creator data unless the user explicitly says:
+
+"Delete [specific records] from [specific file]."
+
+Without explicit deletion instructions, existing creator records are considered protected.
+
+---
+
+# 6. DATA QUALITY
+
+## 6.1 Information Categories
+
+Clearly distinguish between:
+
+- **Verified facts**: Directly confirmed from public source
+- **Extracted information**: Pulled from profile/page content
+- **AI-generated analysis**: Inference from available data (NOT factual evidence)
+- **Reasonable inference**: Logical deduction from verified facts
+- **Unknown**: Information that cannot be verified
+
+## 6.2 Evidence
+
+Important information should have evidence:
+
+```json
+{
+  "followers": {
+    "value": "528K",
+    "source": "SOURCE_URL",
+    "verified_at": "YYYY-MM-DD"
+  }
+}
+```
+
+Never claim information is verified when there is no supporting source.
+
+## 6.3 AI Analysis
+
+When using Hermes or DeepSeek for analysis:
+
+- Do not treat AI output as automatically verified
+- Separate facts from conclusions
+- Do not invent evidence or create fake citations
+- Base conclusions on available evidence
+
+Example:
+
+```
+Verified: The creator publicly mentions using Runway.
+Inference: The creator appears to specialize in AI video content.
+```
+
+## 6.4 Public Information
+
+Only collect information that is publicly accessible:
+
+- Name, username/handle, platform, profile URL
+- Public follower count, biography, website
+- Public business email
+- Content niche, location, language
+- Publicly mentioned AI tools
+- Sample content URLs, source URLs
+- Discovery date, last verified date
+
+Do not access private information, private accounts, passwords, tokens, or unauthorized areas.
+
+---
+
+# 7. OBSIDIAN
+
+## 7.1 Vault Structure
+
+The Obsidian vault is located at:
+
+`obsidian/Creator Research/`
+
+```text
+obsidian/
+└── Creator Research/
+    ├── Attachments/
+    ├── Creators/
+    ├── Daily/
+    ├── Platforms/
+    ├── Projects/
+    └── Research/
+```
+
+Do not create another Obsidian vault. Do not write outside this directory.
+
+## 7.2 Creators/
+
+Individual creator notes. After discovery or scraping, every creator should have a note.
+
+Before creating a note, search for existing notes using ProfileURL, Platform + Handle, or Creator Name.
+
+## 7.3 Platforms/
+
+Platform-level documentation. Create or update only when useful information about the platform is discovered.
+
+Use wikilinks to connect creator notes:
+
+```markdown
+[[runwayml]]
+[[mkbhd]]
+```
+
+## 7.4 Daily/
+
+Daily research and scraping logs. Create/update after discovery or scraping sessions.
+
+## 7.5 Research/
+
+Research findings that are not individual creator profiles. Use for trends, comparative research, methodology.
+
+Do not put individual creator profiles here.
+
+## 7.6 Projects/
+
+Project-specific documentation. Update only when associated with an existing project.
+
+## 7.7 Attachments/
+
+Files intentionally associated with Obsidian notes. Never store secrets, credentials, or private information here.
+
+## 7.8 Cross-Linking
+
+Use Obsidian `[[wikilinks]]` when useful:
+
+- Link creators to platform notes
+- Link creators to research notes
+- Link daily logs to platform notes
+- Link project notes to relevant creators
+
+---
+
+# 8. SCRAPER DEVELOPMENT
+
+## 8.1 Principles
+
+Before creating a new scraper:
+
+1. Inspect existing scrapers
+2. Understand the current architecture
+3. Determine whether an existing scraper can be extended
+4. Reuse existing utilities where possible
+5. Create new code only when necessary
+
+Typical scraper location: `Code/scraper/`
+
+## 8.2 Modifying Scrapers
+
+1. Read the existing implementation
+2. Understand the current behavior
+3. Identify the actual problem
+4. Make the smallest appropriate change
+5. Run the scraper or relevant test
+6. Inspect the output
+7. Verify that the change works
+8. Document important changes
+
+Use: clear functions, meaningful variable names, error handling, logging, validation, reasonable retries, reasonable delays.
+
+Avoid unnecessary rewrites.
+
+## 8.3 Crawl4AI
+
+Crawl4AI is installed in this project. Use it when it provides a reliable advantage for browser-based scraping, but do not automatically replace existing platform scrapers.
+
+Test Crawl4AI against the existing scraper before replacing one.
+
+## 8.4 AI Classification
+
+AI classification must remain separate from the scraping layer. The scraper collects raw information first. The AI classification layer determines tags, PrimaryAITool, AIGCVerdict, Language, Evidence.
+
+Do not hardcode the AI provider into scraping logic.
+
+---
+
+# 9. ERROR HANDLING
+
+When something fails:
+
+1. Read the complete error
+2. Identify the actual cause
+3. Inspect the relevant code or configuration
+4. Determine whether the problem is temporary or permanent
+5. Make the smallest appropriate fix
+6. Test again
+7. Verify the result
+8. Report the problem if it remains unresolved
+
+Do not hide errors. Do not silently ignore failed scraping attempts.
+
+If a profile cannot be scraped:
+
+1. Do not silently pretend it succeeded
+2. Preserve the original input record
+3. Mark the result as failed where supported
+4. Record the reason in Notes or an appropriate failure field
+5. Continue processing the remaining profiles
+6. Report successful and failed counts to the user
+
+---
+
+# 10. REPORTING
+
+When reporting completed work, use a clear structure:
+
+```
+Completed:
+- Found 25 candidate creators.
+- Verified 18 creators.
+- Removed 7 duplicates or irrelevant profiles.
+- Added 18 records to the dataset.
+- Created 12 Obsidian creator notes.
+
+Issues:
+- 3 profiles could not be verified.
+- 2 pages blocked automated access.
+
+Next steps:
+- Review the unverified profiles.
+- Continue discovery if more creators are required.
+```
+
+Clearly distinguish: completed work, verified information, assumptions, errors, unresolved issues, recommended next steps.
+
+---
+
+# 11. PROJECT STRUCTURE
+
+The actual project structure:
+
+```text
+Creator Research System/
+├── AGENTS.md
+├── SOUL.md
+├── Code/
+│   └── scraper/
+│       ├── civitai.py
+│       ├── facebook.py
+│       ├── instagram.py
+│       ├── linkedin.py
+│       ├── main.py
+│       ├── reddit.py
+│       ├── scrape_all.py
+│       ├── threads.py
+│       ├── tiktok.py
+│       └── vimeo.py
+├── analysis/
+├── data/
+│   ├── input/
+│   │   └── input_channels.csv
+│   ├── output/
+│   │   ├── all_scraped_output.csv
+│   │   ├── civitai_scraped_output.csv
+│   │   ├── facebook_scraped_output.csv
+│   │   ├── free_scraped_influencers.csv
+│   │   ├── instagram_scraped_output.csv
+│   │   ├── linkedin_scraped_output.csv
+│   │   ├── threads_scraped_output.csv
+│   │   ├── tiktok_scraped_output.csv
+│   │   └── youtube_refreshed_output.csv
+│   └── Creator-Intel-CRM-List.csv
+└── obsidian/
+    └── Creator Research/
+        ├── Attachments/
+        ├── Creators/
+        ├── Daily/
+        ├── Platforms/
+        ├── Projects/
+        └── Research/
+```
+
+IMPORTANT:
+
+- The project uses lowercase `data/`, not `Data/`
+- The input directory is `data/input/`
+- The output directory is `data/output/`
+- The Obsidian vault is `obsidian/Creator Research/`
+- Creator notes are stored in `obsidian/Creator Research/Creators/`
+- Scrapers are stored in `Code/scraper/`
+
+Do not invent alternative directories unless the user explicitly requests a restructuring.
+
+---
+
+# 12. VERSION CONTROL
+
+If Git is used:
+
+- Review changes before committing
+- Check for API keys, passwords, tokens, cookies, session data, private credentials
+- Never commit secrets
+- Use `.gitignore` appropriately
+
+---
+
+# 13. SECRETS
+
+Never place secrets inside:
+
+- Source code, Markdown notes, Obsidian notes
+- CSV files, JSON files, README files
+- Git commits
+
+Use environment variables or appropriate secret storage. Examples: `DEEPSEEK_API_KEY`, `API_KEY`, `PASSWORD`, `ACCESS_TOKEN`, `SESSION_TOKEN`, `COOKIE`.
+
+Never expose actual secret values.
+
+---
+
+# 14. DATA PROCESSING
+
+Use deterministic code whenever possible.
+
+Prefer Python for: scraping, parsing, cleaning, normalization, deduplication, validation, CSV/JSON processing.
+
+Use AI for: classification, summarization, relevance analysis, content analysis, reasoning, research assistance.
+
+Do not use AI unnecessarily for operations that can be performed reliably with deterministic code.
+
+---
+
+# 15. DATA PIPELINE
+
+The preferred workflow:
+
+```
+Web Search
+    ↓
+Creator Discovery
+    ↓
+Public Profile
+    ↓
+Scraping
+    ↓
+Raw Data
+    ↓
+Cleaning
+    ↓
+Normalization
+    ↓
+Validation
+    ↓
+AI Analysis
+    ↓
+Final Dataset
+    ↓
+Obsidian Knowledge Base
+```
+
+Keep raw data separate from processed data. Do not overwrite raw data unnecessarily.
+
+---
+
+# 16. FILE MANAGEMENT
+
+Before editing a file:
+
+1. Read the relevant file
+2. Understand its purpose
+3. Preserve existing useful content
+4. Make only the required changes
+5. Verify the result
+
+Do not delete or replace files without a clear reason. Do not create unnecessary duplicate files. Use descriptive filenames.
+
+---
+
+The overall objective is to produce creator intelligence that is:
+
+**Accurate + Verifiable + Structured + Reusable + Well-organized.**

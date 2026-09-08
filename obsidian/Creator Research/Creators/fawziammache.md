@@ -1,55 +1,63 @@
 ---
-name: @fawziammache
+name: fawziammache
 handle: @fawziammache
 platform: TikTok
 profile_url: https://www.tiktok.com/@fawziammache
+https://www.tiktok.com/@fawziammache
 followers: 133.4K
-email: 
-category: AIGC,TikTok,AI motivation
+133.4K
+email: Not publicly available
+category: AIGC,TikTok,AI explainer,design
 language: English
-region: 
+region: Canada
 ai_tools: GenAI
+GenAI
 status: Scraped
-discovered_at: 2026-09-01
-last_scraped_at: 2026-09-01
-last_verified: 2026-09-01
+Scraped
+discovered_at: 2026-09-03T02:06:12Z
+last_scraped_at: 2026-09-08T05:29:37Z
+2026-09-03T02:28:31Z
+last_verified: 2026-09-08T05:29:37Z
+2026-09-03
 ---
 
-# @fawziammache
+# fawziammache (@fawziammache)
 
 ## Profile
 
-**Handle:** @fawziammache
-**Platform:** TikTok
-**Followers:** 133.4K
-**Email:** 
-**Region:** 
-**Language:** English
-**Primary AI Tool:** GenAI
-**AIGC Verdict:** yes
+- **Handle:** @fawziammache
+- **Platform:** TikTok
+- **Profile URL:** https://www.tiktok.com/@fawziammache
+- **Follower Count:** 133.4K
+- **Region:** Canada
+- **Language:** English
 
-## Bio
+## AI / Content
 
-📍Toronto // 🇱🇧🇨🇦
-⚙️ Designer & Engineer
-🤖 Explaining AI without the hype
-✍️ 100% hand-drawn visuals
+- **AIGC Verdict:** yes
+- **Primary AI Tool:** GenAI
+- **Tags:** AIGC,TikTok,AI explainer,design
 
-## External Link
+## Contact
 
-futurewithfawzi.com/links
-
-## Sample Content
-
-futurewithfawzi.com/links
+- **Email:** Not publicly available
+- **Contact Source:** https://www.tiktok.com/@fawziammache
 
 ## Evidence
 
-TikTok scrape: followers=133.4K; bio_link=futurewithfawzi.com/links
+- **Source:** web_search: Feedspot Top 40 AI TikTok Influencers 2026
+- **Scraped At:** 2026-09-03T02:28:31Z
+- **Bio Preview:** 📍Toronto // 🇱🇧🇨🇦
+⚙️ Designer & Engineer
+🤖 Explaining AI without the hype
+✍️ 100% hand-drawn visuals
+- **External Link:** https://www.tiktok.com/@fawziammache
 
 ## Notes
 
-- Last scraped: 2026-09-01
-- Source: TikTok profile scrape via Playwright + Ollama classifier
+TikTok scrape: followers=133.4K; bio_link=futurewithfawzi.com/links
 
 ## Related
+
+- [[Platforms/TikTok]]
+- [[Daily/2026-09-03]]

@@ -1,18 +1,20 @@
 ---
+
 name: @rileybrown.ai
 handle: @rileybrown.ai
 platform: TikTok
 profile_url: https://www.tiktok.com/@rileybrown.ai
 followers: 636.6K
-email: 
+email: not exposed
 category: AIGC,TikTok,AI fashion
 language: English
 region: 
 ai_tools: GenAI
 status: Scraped
 discovered_at: 2026-09-01
-last_scraped_at: 2026-09-01
-last_verified: 2026-09-01
+last_scraped_at: 2026-09-02
+last_verified: 2026-09-02
+
 ---
 
 # @rileybrown.ai
@@ -22,8 +24,8 @@ last_verified: 2026-09-01
 **Handle:** @rileybrown.ai
 **Platform:** TikTok
 **Followers:** 636.6K
-**Email:** 
-**Region:** 
+**Email:** nan
+**Region:** nan
 **Language:** English
 **Primary AI Tool:** GenAI
 **AIGC Verdict:** yes
@@ -46,7 +48,10 @@ TikTok scrape: followers=636.6K; bio_link=shop.genspark.ai/s/rileybrown
 
 ## Notes
 
-- Last scraped: 2026-09-01
+- Last scraped: 2026-09-02
 - Source: TikTok profile scrape via Playwright + Ollama classifier
 
 ## Related
+
+- [[Platforms/YouTube]]
+- [[2026-09-02]]

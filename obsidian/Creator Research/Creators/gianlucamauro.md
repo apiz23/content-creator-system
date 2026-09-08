@@ -37,3 +37,6 @@ His TikTok content focuses on AI news, business applications of AI, and AI educa
 **Source:** FeedSpot Top 40 AI TikTok Influencers in 2026 (updated Aug 19, 2026); gianlucamauro.com; LinkedIn profile
 
 ## Related
+
+- [[Platforms/YouTube]]
+- [[2026-09-02]]

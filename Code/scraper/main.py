@@ -5,12 +5,17 @@ import requests
 import pandas as pd
 from datetime import datetime
 import yt_dlp
+from pathlib import Path
+
+from model_client import call_model
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 # --- CONFIGURATION ---
-INPUT_CSV_FILE = "input_channels.csv"           # Path to your input CSV
-OUTPUT_CSV_FILE = "youtube_refreshed_output.csv" # Output updated CSV
+INPUT_CSV_FILE = PROJECT_ROOT / "data/input/input_channels.csv"
+OUTPUT_CSV_FILE = PROJECT_ROOT / "data/output/youtube_refreshed_output.csv"
 
-# 1. Local AI Classifier via Ollama (llama3.2)
+# 1. AI Classifier
 def classify_with_local_llm(bio: str, sample_text: str):
     prompt = f"""
     Analyze this creator's bio and sample content.
@@ -27,17 +32,8 @@ def classify_with_local_llm(bio: str, sample_text: str):
     }}
     """
     try:
-        res = requests.post(
-            "http://localhost:11434/api/generate",
-            json={
-                "model": "qwen3.5:latest",
-                "prompt": prompt,
-                "format": "json",
-                "stream": False
-            },
-            timeout=15
-        )
-        return json.loads(res.json().get("response", "{}"))
+        response_text = call_model(prompt, format="json", timeout=15)
+        return json.loads(response_text)
     except Exception:
         # Smart fallback if Ollama is not active
         combined = f"{bio} {sample_text}".lower()

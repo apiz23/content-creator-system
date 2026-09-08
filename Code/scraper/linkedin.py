@@ -6,12 +6,17 @@ import requests
 import pandas as pd
 from datetime import datetime
 from playwright.sync_api import sync_playwright
+from pathlib import Path
+
+from model_client import call_model
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 # --- CONFIGURATION ---
-INPUT_CSV_FILE = "input_channels.csv"             # Input CSV with LinkedIn URLs
-OUTPUT_CSV_FILE = "linkedin_scraped_output.csv"   # Output updated CSV
+INPUT_CSV_FILE = PROJECT_ROOT / "data/input/input_channels.csv"
+OUTPUT_CSV_FILE = PROJECT_ROOT / "data/output/linkedin_scraped_output.csv"
 
-# 1. Zero-Cost Local AI Classifier via Ollama
+# 1. AI Classifier
 def classify_with_local_llm(headline_and_bio: str, name: str):
     prompt = f"""
     Analyze this LinkedIn professional profile:
@@ -29,17 +34,8 @@ def classify_with_local_llm(headline_and_bio: str, name: str):
     }}
     """
     try:
-        res = requests.post(
-            "http://localhost:11434/api/generate",
-            json={
-                "model": "qwen3.5:latest",
-                "prompt": prompt,
-                "format": "json",
-                "stream": False
-            },
-            timeout=15
-        )
-        return json.loads(res.json().get("response", "{}"))
+        response_text = call_model(prompt, format="json", timeout=15)
+        return json.loads(response_text)
     except Exception:
         combined = f"{name} {headline_and_bio}".lower()
         tools = [t.title() for t in ["chatgpt", "claude", "cursor", "langchain", "midjourney", "runway", "sora", "copilot"] if t in combined]

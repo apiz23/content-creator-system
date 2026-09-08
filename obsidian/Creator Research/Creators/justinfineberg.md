@@ -1,55 +1,63 @@
 ---
-name: @justinfineberg
+name: justinfineberg
 handle: @justinfineberg
 platform: TikTok
 profile_url: https://www.tiktok.com/@justinfineberg
-followers: 288.8K
-email: 
-category: AIGC,TikTok,AI agents,CEO
+https://www.tiktok.com/@justinfineberg
+followers: 288.7K
+288.8K
+email: Not publicly available
+category: AIGC,TikTok,AI agents,business
 language: English
-region: 
+region: US
 ai_tools: GenAI
+GenAI
 status: Scraped
-discovered_at: 2026-09-01
-last_scraped_at: 2026-09-01
-last_verified: 2026-09-01
+Scraped
+discovered_at: 2026-09-03T02:06:12Z
+last_scraped_at: 2026-09-08T05:29:20Z
+2026-09-03T02:28:13Z
+last_verified: 2026-09-08T05:29:20Z
+2026-09-03
 ---
 
-# @justinfineberg
+# justinfineberg (@justinfineberg)
 
 ## Profile
 
-**Handle:** @justinfineberg
-**Platform:** TikTok
-**Followers:** 288.8K
-**Email:** 
-**Region:** 
-**Language:** English
-**Primary AI Tool:** GenAI
-**AIGC Verdict:** yes
+- **Handle:** @justinfineberg
+- **Platform:** TikTok
+- **Profile URL:** https://www.tiktok.com/@justinfineberg
+- **Follower Count:** 288.8K
+- **Region:** US
+- **Language:** English
 
-## Bio
+## AI / Content
 
-CEO @ Cassidy.ai 🔮
-AI Agents that operate like your team 🚀
-Follow me to stay ahead in AI👇
-(We're hir
+- **AIGC Verdict:** yes
+- **Primary AI Tool:** GenAI
+- **Tags:** AIGC,TikTok,AI agents,business
 
-## External Link
+## Contact
 
-linktr.ee/justinfineberg
-
-## Sample Content
-
-linktr.ee/justinfineberg
+- **Email:** Not publicly available
+- **Contact Source:** https://www.tiktok.com/@justinfineberg
 
 ## Evidence
 
-TikTok scrape: followers=288.8K; bio_link=linktr.ee/justinfineberg
+- **Source:** web_search: Feedspot Top 40 AI TikTok Influencers 2026
+- **Scraped At:** 2026-09-03T02:28:13Z
+- **Bio Preview:** CEO @ Cassidy.ai 🔮
+AI Agents that operate like your team 🚀
+Follow me to stay ahead in AI👇
+(We're hir
+- **External Link:** https://www.tiktok.com/@justinfineberg
 
 ## Notes
 
-- Last scraped: 2026-09-01
-- Source: TikTok profile scrape via Playwright + Ollama classifier
+TikTok scrape: followers=288.8K; bio_link=linktr.ee/justinfineberg
 
 ## Related
+
+- [[Platforms/TikTok]]
+- [[Daily/2026-09-03]]

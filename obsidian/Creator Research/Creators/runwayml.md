@@ -1,58 +1,51 @@
 ---
-name: @runwayml
-handle: @runwayml
-platform: Facebook
-profile_url: https://facebook.com/runwayml
-followers: 4K
-email: not exposed
-category: AIGC Creator
-language: English
-region: USA
+name: runwayml
+handle: runwayml
+platform: YouTube
+profile_url: https://youtube.com/@runwayml
+followers: 135000
+email: Not publicly available
+category: AI Video / Generative AI / Filmmaking
+language: Unknown
+region: Unknown
 ai_tools: Runway
-status: New
-last_verified: 2026-09-01
-discovered_at: 2026-07-25T10:16:27Z
-last_scraped_at: 2026-08-27T05:39:29Z
+status: Updated
+last_verified: 2026-09-03T08:00:34Z
+discovered_at: 2026-09-03T08:00:34Z
+last_scraped_at: 2026-09-03T08:00:34Z
 ---
 
-# @runwayml
+# runwayml
 
 ## Profile
 
-- **Handle:** @runwayml
-- **Platform:** Facebook
-- **Profile URL:** https://facebook.com/runwayml
-- **Follower Count:** 4K
-- **Region:** USA
-- **Language:** English
+- **Handle:** runwayml
+- **Platform:** YouTube
+- **Profile URL:** https://youtube.com/@runwayml
+- **Follower Count:** 135000
 
-## Content
+## AI / Content
 
-- **Tags:** AIGC, Meta, Runway
-- **AIGC Verdict:** yes
+- **AIGC Verdict:** Yes — content appears AI-generated or AI-assisted
 - **Primary AI Tool:** Runway
-- **Bio Preview:** Runway • 4K pengikut • Applied AI research and creative tools
+- **Language:** Unknown
+- **Tags:** AIGC,YouTube,Runway
 
 ## Contact
 
-- **Email:** not exposed
-- **Contact Source:** http://runwayml.com/
+- **Email:** Not publicly available
 
 ## Evidence
 
-- **Source URL:** https://facebook.com/runwayml
-- **Sample Content:** http://runwayml.com/
-- **Title:** Runway
-- **Notes:** Facebook scrape: followers=4K; Runway Applied AI Research
-- **Last Scraped:** 2026-08-27T05:39:29Z
-- **Discovered At:** 2026-07-25T10:16:27Z
-- **Source:** SearXNG Runway AI video creator site:facebook.com
+- **Source URL:** https://youtube.com/@runwayml
+- **Sample Content:** https://www.youtube.com/@runwayml/videos
 
-## Analysis
 
-- This Facebook profile publicly presents AI-generated content or identifies as an AI creator/filmmaker.
+## Notes
+
+api_refresh: YouTube subscribers=135000; videos=2; channelId=UCUBqu_z5uP0AZhYtuyFZB3g; recent_title=Runway - Videos
 
 ## Related
 
-- [[Facebook]]
-- [[runwayml]]
+- [[Platforms/YouTube]]
+- [[Daily/2026-09-03]]

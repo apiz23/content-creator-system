@@ -6,9 +6,14 @@ import requests
 import pandas as pd
 from datetime import datetime
 from playwright.sync_api import sync_playwright
+from pathlib import Path
 
-INPUT_CSV_FILE = "input_channels.csv"
-OUTPUT_CSV_FILE = "instagram_scraped_output.csv"
+from model_client import call_model
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+INPUT_CSV_FILE = PROJECT_ROOT / "data/input/input_channels.csv"
+OUTPUT_CSV_FILE = PROJECT_ROOT / "data/output/instagram_scraped_output.csv"
 
 def classify_with_local_llm(bio: str, handle: str):
     prompt = f"""
@@ -26,12 +31,8 @@ def classify_with_local_llm(bio: str, handle: str):
     }}
     """
     try:
-        res = requests.post(
-            "http://localhost:11434/api/generate",
-            json={"model": "qwen3.5:latest", "prompt": prompt, "format": "json", "stream": False},
-            timeout=15
-        )
-        return json.loads(res.json().get("response", "{}"))
+        response_text = call_model(prompt, format="json", timeout=15)
+        return json.loads(response_text)
     except Exception:
         combined = f"{handle} {bio}".lower()
         tools = [t.title() for t in ["midjourney", "sora", "runway", "kling", "luma", "chatgpt"] if t in combined]
@@ -56,6 +57,19 @@ def scrape_instagram_playwright(page, profile_url: str):
 
         # 1. Extract metadata from OpenGraph tags (Bypasses UI rate limits)
         og_desc = page.locator('meta[property="og:description"]').get_attribute("content") or ""
+        if not og_desc:
+            # fallback: try page meta description and title
+            og_desc = (page.locator('meta[name="description"]').get_attribute("content") or "") + " " + (page.title() or "")
+            # Also try grabbing the description from the JSON-LD or other meta tags
+            desc_json = page.locator('script[type="application/ld+json"]').content()
+            if desc_json:
+                try:
+                    import json as _json
+                    ld = _json.loads(desc_json)
+                    if isinstance(ld, dict) and ld.get("description"):
+                        og_desc = ld["description"]
+                except Exception:
+                    pass
         
         # Format usually: "10K Followers, 150 Following, 42 Posts - See Instagram photos..."
         follower_count = "N/A"

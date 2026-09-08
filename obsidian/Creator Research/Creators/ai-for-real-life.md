@@ -52,3 +52,6 @@ TikTok scrape: followers=26.5K; bio_link=stan.store/AiForRealLife
 - Source: TikTok profile scrape via Playwright + Ollama classifier
 
 ## Related
+
+- [[Platforms/YouTube]]
+- [[2026-09-02]]

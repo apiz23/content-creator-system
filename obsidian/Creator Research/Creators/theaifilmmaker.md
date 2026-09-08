@@ -1,54 +1,59 @@
 ---
-name: @theaifilmmaker
+name: theaifilmmaker
 handle: @theaifilmmaker
-platform: TikTok
+platform: Instagram
 profile_url: https://tiktok.com/@theaifilmmaker
+https://instagram.com/theaifilmmaker
 followers: 17.8K
-email: 
+155K
+email: Not publicly available
 category: AIGC,Sora
 language: English
 region: 
 ai_tools: GenAI
+GenAI
 status: Scraped
-discovered_at: 2026-08-06T14:13:11Z
-last_scraped_at: 2026-09-01
-last_verified: 2026-09-01
+Scraped
+discovered_at: 2026-08-02T10:10:28Z
+last_scraped_at: 2026-09-08T05:22:32Z
+2026-09-02T06:45:48Z
+last_verified: 2026-09-08T05:22:32Z
+2026-09-03
 ---
 
-# @theaifilmmaker
+# theaifilmmaker (@theaifilmmaker)
 
 ## Profile
 
-**Handle:** @theaifilmmaker
-**Platform:** TikTok
-**Followers:** 17.8K
-**Email:** 
-**Region:** 
-**Language:** English
-**Primary AI Tool:** GenAI
-**AIGC Verdict:** yes
+- **Handle:** @theaifilmmaker
+- **Platform:** Instagram
+- **Profile URL:** https://instagram.com/theaifilmmaker
+- **Follower Count:** 155K
+- **Region:** 
+- **Language:** English
 
-## Bio
+## AI / Content
 
-👾 Work sketch comedy
-👨‍💼 Send to your work bestie
-📬 neal@theaifilmmaker.co
+- **AIGC Verdict:** yes
+- **Primary AI Tool:** GenAI
+- **Tags:** AIGC,Sora
 
-## External Link
+## Contact
 
-none
-
-## Sample Content
-
-https://tiktok.com/@theaifilmmaker
+- **Email:** Not publicly available
+- **Contact Source:** https://instagram.com/theaifilmmaker
 
 ## Evidence
 
-TikTok scrape: followers=17.8K; bio_link=none
+- **Source:** off-platform sweep (searx): "AI filmmaker" Sora site:instagram.com
+- **Scraped At:** 2026-09-02T06:45:48Z
+- **Bio Preview:** 155K Followers, 0 Following, 301 Posts - See Instagram photos and videos from The AI Filmmaker • Animated Comedy (@theai
 
 ## Notes
 
-- Last scraped: 2026-09-01
-- Source: TikTok profile scrape via Playwright + Ollama classifier
+Playwright scrape: followers=155K
 
 ## Related
+
+- [[Platforms/Instagram]]
+- [[Daily/2026-09-03]]

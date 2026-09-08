@@ -6,12 +6,17 @@ import requests
 import pandas as pd
 from datetime import datetime
 import yt_dlp
+from pathlib import Path
+
+from model_client import call_model
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 # --- CONFIGURATION ---
-INPUT_CSV_FILE = "input_channels.csv"           # Input CSV with Vimeo URLs
-OUTPUT_CSV_FILE = "vimeo_scraped_output.csv"    # Output CSV filename
+INPUT_CSV_FILE = PROJECT_ROOT / "data/input/input_channels.csv"
+OUTPUT_CSV_FILE = PROJECT_ROOT / "data/output/vimeo_scraped_output.csv"
 
-# 1. Zero-Cost Local AI Classifier via Ollama
+# 1. AI Classifier
 def classify_with_local_llm(bio: str, sample_text: str, username: str):
     prompt = f"""
     Analyze this Vimeo filmmaker/creator's profile and video sample:
@@ -30,17 +35,8 @@ def classify_with_local_llm(bio: str, sample_text: str, username: str):
     }}
     """
     try:
-        res = requests.post(
-            "http://localhost:11434/api/generate",
-            json={
-                "model": "qwen3.5:latest",
-                "prompt": prompt,
-                "format": "json",
-                "stream": False
-            },
-            timeout=15
-        )
-        return json.loads(res.json().get("response", "{}"))
+        response_text = call_model(prompt, format="json", timeout=15)
+        return json.loads(response_text)
     except Exception:
         combined = f"{username} {bio} {sample_text}".lower()
         tools = [t.title() for t in ["runway", "sora", "pika", "midjourney", "kling", "luma", "comfyui", "stable diffusion"] if t in combined]

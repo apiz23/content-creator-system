@@ -5,13 +5,18 @@ import time
 import requests
 import pandas as pd
 from datetime import datetime
+from pathlib import Path
+
+from model_client import call_model
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 # --- CONFIGURATION ---
-INPUT_CSV_FILE = "input_channels.csv"             # Input CSV with Civitai URLs
-OUTPUT_CSV_FILE = "civitai_scraped_output.csv"   # Output updated CSV
+INPUT_CSV_FILE = PROJECT_ROOT / "data/input/input_channels.csv"
+OUTPUT_CSV_FILE = PROJECT_ROOT / "data/output/civitai_scraped_output.csv"
 API_BASE_URL = "https://civitai.com/api/v1"
 
-# 1. Zero-Cost Local AI Classifier via Ollama
+# 1. AI Classifier
 def classify_with_local_llm(bio: str, username: str, models_summary: str):
     prompt = f"""
     Analyze this Civitai AI creator/model developer profile:
@@ -29,17 +34,8 @@ def classify_with_local_llm(bio: str, username: str, models_summary: str):
     }}
     """
     try:
-        res = requests.post(
-            "http://localhost:11434/api/generate",
-            json={
-                "model": "qwen3.5:latest",
-                "prompt": prompt,
-                "format": "json",
-                "stream": False
-            },
-            timeout=15
-        )
-        return json.loads(res.json().get("response", "{}"))
+        response_text = call_model(prompt, format="json", timeout=15)
+        return json.loads(response_text)
     except Exception:
         combined = f"{username} {bio} {models_summary}".lower()
         tool = "LoRA" if "lora" in combined else ("Checkpoint" if "checkpoint" in combined else "Stable Diffusion")

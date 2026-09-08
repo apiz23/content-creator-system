@@ -1,4 +1,5 @@
 ---
+
 name: @tony.aube
 handle: @tony.aube
 platform: TikTok
@@ -11,8 +12,9 @@ region: USA (Silicon Valley)
 ai_tools: GenAI
 status: Scraped
 discovered_at: 2026-09-01T07:27:58Z
-last_scraped_at: 2026-09-01
-last_verified: 2026-09-01
+last_scraped_at: 2026-09-02
+last_verified: 2026-09-02
+
 ---
 
 # @tony.aube
@@ -48,7 +50,10 @@ TikTok scrape: followers=423.7K; bio_link=www.tonyaube.com/find-me
 
 ## Notes
 
-- Last scraped: 2026-09-01
+- Last scraped: 2026-09-02
 - Source: TikTok profile scrape via Playwright + Ollama classifier
 
 ## Related
+
+- [[Platforms/YouTube]]
+- [[2026-09-02]]

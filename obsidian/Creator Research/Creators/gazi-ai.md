@@ -1,18 +1,20 @@
 ---
+
 name: @gazi.ai
 handle: @gazi.ai
 platform: TikTok
 profile_url: https://www.tiktok.com/@gazi.ai
 followers: 664.2K
-email: 
+email: not exposed
 category: AIGC,TikTok,AI content
 language: English
 region: 
 ai_tools: GenAI
 status: Scraped
 discovered_at: 2026-09-01
-last_scraped_at: 2026-09-01
-last_verified: 2026-09-01
+last_scraped_at: 2026-09-02
+last_verified: 2026-09-02
+
 ---
 
 # @gazi.ai
@@ -22,8 +24,8 @@ last_verified: 2026-09-01
 **Handle:** @gazi.ai
 **Platform:** TikTok
 **Followers:** 664.2K
-**Email:** 
-**Region:** 
+**Email:** nan
+**Region:** nan
 **Language:** English
 **Primary AI Tool:** GenAI
 **AIGC Verdict:** yes
@@ -47,7 +49,10 @@ TikTok scrape: followers=664.2K; bio_link=beacons.ai/gazi.ai
 
 ## Notes
 
-- Last scraped: 2026-09-01
+- Last scraped: 2026-09-02
 - Source: TikTok profile scrape via Playwright + Ollama classifier
 
 ## Related
+
+- [[Platforms/YouTube]]
+- [[2026-09-02]]

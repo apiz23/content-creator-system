@@ -6,12 +6,14 @@ import requests
 import pandas as pd
 from datetime import datetime
 from urllib.parse import unquote
+from pathlib import Path
 
-# --- CONFIGURATION ---
-INPUT_CSV_FILE = "input_channels.csv"
-OUTPUT_CSV_FILE = "all_scraped_output.csv"
+from model_client import call_model
 
-# --- SHARED UTILITIES ---
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+INPUT_CSV_FILE = PROJECT_ROOT / "data/input/input_channels.csv"
+OUTPUT_CSV_FILE = PROJECT_ROOT / "data/output/all_scraped_output.csv"
 
 def classify_with_local_llm(bio: str, handle: str, platform: str, extra: str = ""):
     prompt = f"""
@@ -31,12 +33,8 @@ def classify_with_local_llm(bio: str, handle: str, platform: str, extra: str = "
     }}
     """
     try:
-        res = requests.post(
-            "http://localhost:11434/api/generate",
-            json={"model": "qwen3.5:latest", "prompt": prompt, "format": "json", "stream": False},
-            timeout=15
-        )
-        return json.loads(res.json().get("response", "{}"))
+        response_text = call_model(prompt, format="json", timeout=15)
+        return json.loads(response_text)
     except Exception:
         combined = f"{handle} {bio} {extra}".lower()
         tools = [t.title() for t in [

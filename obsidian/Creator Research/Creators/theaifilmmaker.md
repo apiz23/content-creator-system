@@ -1,59 +1,47 @@
 ---
-name: theaifilmmaker
+name: @theaifilmmaker
 handle: @theaifilmmaker
-platform: Instagram
+platform: TikTok
 profile_url: https://tiktok.com/@theaifilmmaker
-https://instagram.com/theaifilmmaker
 followers: 17.8K
-155K
-email: Not publicly available
 category: AIGC,Sora
 language: English
-region: 
+region: nan
 ai_tools: GenAI
-GenAI
-status: Scraped
-Scraped
-discovered_at: 2026-08-02T10:10:28Z
-last_scraped_at: 2026-09-08T05:22:32Z
-2026-09-02T06:45:48Z
-last_verified: 2026-09-08T05:22:32Z
-2026-09-03
+status: active
+discovered_at: 2026-08-06T14:13:11Z
+last_verified: 2026-09-09T03:13:27Z
+last_scraped_at: 2026-09-09T03:13:27Z
 ---
 
-# theaifilmmaker (@theaifilmmaker)
+# @theaifilmmaker
 
 ## Profile
-
 - **Handle:** @theaifilmmaker
-- **Platform:** Instagram
-- **Profile URL:** https://instagram.com/theaifilmmaker
-- **Follower Count:** 155K
-- **Region:** 
-- **Language:** English
+- **Platform:** TikTok
+- **Profile URL:** https://tiktok.com/@theaifilmmaker
+- **Follower Count:** 17.8K
 
 ## AI / Content
-
-- **AIGC Verdict:** yes
 - **Primary AI Tool:** GenAI
+- **AIGC Verdict:** yes
+- **Language:** English
 - **Tags:** AIGC,Sora
 
 ## Contact
-
-- **Email:** Not publicly available
-- **Contact Source:** https://instagram.com/theaifilmmaker
+- **Email:** nan
+- **Contact Source:** https://tiktok.com/@theaifilmmaker
 
 ## Evidence
+- **Source:** off-platform sweep (ddgs): "AI filmmaker" Sora site:tiktok.com/@
+- **Sample Content:** https://tiktok.com/@theaifilmmaker
+- **Evidence:** TikTok scrape: followers=17.8K; bio_link=none
 
-- **Source:** off-platform sweep (searx): "AI filmmaker" Sora site:instagram.com
-- **Scraped At:** 2026-09-02T06:45:48Z
-- **Bio Preview:** 155K Followers, 0 Following, 301 Posts - See Instagram photos and videos from The AI Filmmaker • Animated Comedy (@theai
-
-## Notes
-
-Playwright scrape: followers=155K
+## Research Notes
+- **Last Scraped:** 2026-09-09T03:13:27Z
+- **Notes:** TikTok scrape: followers=17.8K; bio_link=none
 
 ## Related
 
-- [[Platforms/Instagram]]
-- [[Daily/2026-09-03]]
+- [[Platforms/TikTok]]
+- [[Daily/2026-09-09]]

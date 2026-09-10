@@ -6,18 +6,24 @@ import requests
 import pandas as pd
 from datetime import datetime
 from pathlib import Path
+import argparse
 
 from model_client import call_model
-
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+from common import (
+    PROJECT_ROOT, INPUT_CSV_FILE, TARGET_COLUMNS,
+    load_and_clean_csv, get_column_names, enforce_target_columns,
+    merge_scraped_row, extract_email, filter_platform_rows
+)
 
 # --- CONFIGURATION ---
-INPUT_CSV_FILE = PROJECT_ROOT / "data/input/input_channels.csv"
 OUTPUT_CSV_FILE = PROJECT_ROOT / "data/output/civitai_scraped_output.csv"
 API_BASE_URL = "https://civitai.com/api/v1"
 
-# 1. AI Classifier
-def classify_with_local_llm(bio: str, username: str, models_summary: str):
+
+def classify_with_local_llm(bio: str, username: str, models_summary: str, model_provider=None, model_name=None):
+    """
+    Analyze Civitai AI creator/model developer profile using local LLM.
+    """
     prompt = f"""
     Analyze this Civitai AI creator/model developer profile:
     Username: {username}
@@ -34,7 +40,7 @@ def classify_with_local_llm(bio: str, username: str, models_summary: str):
     }}
     """
     try:
-        response_text = call_model(prompt, format="json", timeout=15)
+        response_text = call_model(prompt, format="json", timeout=15, model_provider=model_provider, model_name=model_name)
         return json.loads(response_text)
     except Exception:
         combined = f"{username} {bio} {models_summary}".lower()
@@ -47,11 +53,6 @@ def classify_with_local_llm(bio: str, username: str, models_summary: str):
             "Evidence": "Rule-based fallback for Civitai creator"
         }
 
-def extract_email(text: str):
-    if not text:
-        return "not exposed"
-    match = re.search(r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+', str(text))
-    return match.group(0) if match else "not exposed"
 
 def extract_civitai_username(raw_url: str):
     if not isinstance(raw_url, str) or not raw_url.strip():
@@ -63,8 +64,9 @@ def extract_civitai_username(raw_url: str):
     clean_path = raw_url.strip("/").split("/")
     return clean_path[-1] if clean_path else None
 
+
 # 2. Fetch Creator Data via Civitai Official API
-def fetch_civitai_creator(username: str):
+def fetch_civitai_creator(username: str, model_provider=None, model_name=None):
     try:
         # Query creators endpoint
         url = f"{API_BASE_URL}/creators?query={username}&limit=1"
@@ -111,7 +113,7 @@ def fetch_civitai_creator(username: str):
         unique_tags = list(set(model_tags))[:5]
         models_summary = ", ".join(unique_tags)
         
-        ai_meta = classify_with_local_llm(bio, actual_username, models_summary)
+        ai_meta = classify_with_local_llm(bio, actual_username, models_summary, model_provider=model_provider, model_name=model_name)
         email = extract_email(bio)
 
         evidence = {
@@ -143,27 +145,21 @@ def fetch_civitai_creator(username: str):
         print(f"[-] Error querying Civitai API for {username}: {e}")
         return None
 
+
 # --- 3. BATCH PROCESSOR ---
-def main():
-    if not os.path.exists(INPUT_CSV_FILE):
+def main(limit=None, model_provider=None, model_name=None):
+    if not INPUT_CSV_FILE.exists():
         print(f"[!] File '{INPUT_CSV_FILE}' not found.")
         return
 
     print(f"[+] Loading input file: {INPUT_CSV_FILE}")
-    df = pd.read_csv(INPUT_CSV_FILE)
-    df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
-    df.columns = [c.strip() for c in df.columns]
-
-    platform_col = "Platform" if "Platform" in df.columns else df.columns[2]
-    url_col = "ProfileURL" if "ProfileURL" in df.columns else df.columns[0]
+    df = load_and_clean_csv(INPUT_CSV_FILE)
+    platform_col, url_col = get_column_names(df)
 
     # Filter for Civitai rows
-    civitai_mask = (
-        df[platform_col].astype(str).str.strip().str.lower().isin(["civitai"]) |
-        df[url_col].astype(str).str.contains("civitai.com", case=False, na=False)
-    )
-
-    civitai_rows = df[civitai_mask].copy()
+    civitai_rows = filter_platform_rows(df, platform_col, url_col, "civitai", "civitai.com")
+    if limit is not None:
+        civitai_rows = civitai_rows.head(limit)
     print(f"[+] Found {len(civitai_rows)} Civitai profiles to query via API.\n")
 
     if civitai_rows.empty:
@@ -177,44 +173,24 @@ def main():
         username = extract_civitai_username(url)
         print(f"[{idx}/{len(civitai_rows)}] Querying Civitai user: {username or url}")
 
-        scraped_data = fetch_civitai_creator(username) if username else None
-
+        scraped_data = fetch_civitai_creator(username, model_provider=model_provider, model_name=model_name) if username else None
         row_dict = row.to_dict()
         row_dict["Platform"] = "Civitai"
-
-        if scraped_data:
-            row_dict["Name/Handle"] = scraped_data["Handle"]
-            row_dict["FollowerCount"] = scraped_data["FollowerCount"]
-            if row_dict.get("Email") in [None, "", "not exposed"]:
-                row_dict["Email"] = scraped_data["Email"]
-            row_dict["LastScrapedAt"] = scraped_data["LastScrapedAt"]
-            row_dict["Language"] = scraped_data["Language"]
-            row_dict["PrimaryAITool"] = scraped_data["PrimaryAITool"] or row_dict.get("PrimaryAITool")
-            row_dict["SampleContentURL"] = scraped_data["SampleContentURL"] or row_dict.get("SampleContentURL")
-            row_dict["AIGCVerdict"] = scraped_data["AIGCVerdict"]
-            row_dict["Notes"] = scraped_data["Notes"]
-            row_dict["FeedURL"] = scraped_data["FeedURL"]
-            row_dict["ContactSourceURL"] = scraped_data["ContactSourceURL"]
-            row_dict["EvidenceJSON"] = scraped_data["EvidenceJSON"]
-
+        row_dict = merge_scraped_row(row_dict, scraped_data)
         updated_rows.append(row_dict)
         time.sleep(1)  # Polite pacing for public API
 
     # Save to CSV
     final_df = pd.DataFrame(updated_rows)
-    target_columns = [
-        "ProfileURL", "Name/Handle", "Platform", "FollowerCount", "Email", "Tags",
-        "OutreachStatus", "LastScrapedAt", "Region", "Language", "PrimaryAITool",
-        "SampleContentURL", "AIGCVerdict", "DiscoveredAt", "Source", "Notes",
-        "FeedURL", "ContactSourceURL", "EvidenceJSON"
-    ]
-    for col in target_columns:
-        if col not in final_df.columns:
-            final_df[col] = None
-
-    final_df = final_df[target_columns]
+    final_df = enforce_target_columns(final_df)
     final_df.to_csv(OUTPUT_CSV_FILE, index=False)
     print(f"\n[✓] Completed! Saved {len(final_df)} Civitai records to '{OUTPUT_CSV_FILE}'.")
 
+
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--limit", type=int, default=None, help="Max Civitai profiles to process")
+    parser.add_argument("--model-provider", type=str, default=None, help="Override MODEL_PROVIDER for this run")
+    parser.add_argument("--model-name", type=str, default=None, help="Override MODEL_NAME for this run")
+    args = parser.parse_args()
+    main(limit=args.limit, model_provider=args.model_provider, model_name=args.model_name)

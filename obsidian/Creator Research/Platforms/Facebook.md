@@ -143,3 +143,4 @@ All 3 successful scrapes showed **Malay UI language** in og:description regardle
 - Facebook's anti-bot measures frequently block Playwright scraping — og:title timeouts on 2 of 9 profiles in latest run
 - FB pages often show localized language (Malay, Portuguese) in og:description regardless of actual audience — use with caution when interpreting language field
 - Virtual influencer FB pages tend to have far fewer FB followers than IG/TikTok — FB is secondary platform for most
+- **Discovery scrape 2026-09-10:** 1 new Facebook AI creator scraped and added to CRM (ausar.ai)

@@ -8,17 +8,23 @@ from datetime import datetime
 from urllib.parse import unquote
 from playwright.sync_api import sync_playwright
 from pathlib import Path
+import argparse
 
 from model_client import call_model
-
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+from common import (
+    PROJECT_ROOT, INPUT_CSV_FILE, TARGET_COLUMNS,
+    load_and_clean_csv, get_column_names, enforce_target_columns,
+    merge_scraped_row, extract_email, filter_platform_rows
+)
 
 # --- CONFIGURATION ---
-INPUT_CSV_FILE = PROJECT_ROOT / "data/input/input_channels.csv"
 OUTPUT_CSV_FILE = PROJECT_ROOT / "data/output/facebook_scraped_output.csv"
 
-# 1. AI Classifier
-def classify_with_local_llm(bio: str, handle: str):
+
+def classify_with_local_llm(bio: str, handle: str, model_provider=None, model_name=None):
+    """
+    Analyze Facebook page/creator's name and bio using local LLM.
+    """
     prompt = f"""
     Analyze this Facebook page/creator's name and bio.
     Name/Handle: {handle}
@@ -34,7 +40,7 @@ def classify_with_local_llm(bio: str, handle: str):
     }}
     """
     try:
-        response_text = call_model(prompt, format="json", timeout=15)
+        response_text = call_model(prompt, format="json", timeout=15, model_provider=model_provider, model_name=model_name)
         return json.loads(response_text)
     except Exception:
         combined = f"{handle} {bio}".lower()
@@ -47,11 +53,6 @@ def classify_with_local_llm(bio: str, handle: str):
             "Evidence": "Rule-based keyword fallback"
         }
 
-def extract_email(text: str):
-    if not text:
-        return "not exposed"
-    match = re.search(r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+', str(text))
-    return match.group(0) if match else "not exposed"
 
 def extract_facebook_username(raw_val: str):
     if not isinstance(raw_val, str) or not raw_val.strip():
@@ -64,6 +65,7 @@ def extract_facebook_username(raw_val: str):
             return f"@{name}"
     return val.split('/')[-1] or val
 
+
 # Clean FB redirect links (e.g., l.facebook.com/l.php?u=...)
 def clean_facebook_url(url: str):
     if "l.facebook.com/l.php" in url:
@@ -72,8 +74,9 @@ def clean_facebook_url(url: str):
             return unquote(match.group(1))
     return url
 
+
 # 2. Facebook Profile & Page Scraper via Playwright
-def scrape_facebook_profile(page, profile_url: str):
+def scrape_facebook_profile(page, profile_url: str, model_provider=None, model_name=None):
     try:
         page.goto(profile_url, wait_until="domcontentloaded", timeout=25000)
         time.sleep(2.5)
@@ -122,7 +125,7 @@ def scrape_facebook_profile(page, profile_url: str):
             pass
 
         # AI Classification & Email Discovery
-        ai_meta = classify_with_local_llm(bio, handle or og_title)
+        ai_meta = classify_with_local_llm(bio, handle or og_title, model_provider=model_provider, model_name=model_name)
         email = extract_email(bio)
 
         evidence = {
@@ -155,27 +158,21 @@ def scrape_facebook_profile(page, profile_url: str):
         print(f"[-] Error scraping Facebook {profile_url}: {e}")
         return None
 
+
 # --- 3. BATCH PROCESSOR ---
-def main():
-    if not os.path.exists(INPUT_CSV_FILE):
+def main(limit=None, model_provider=None, model_name=None):
+    if not INPUT_CSV_FILE.exists():
         print(f"[!] File '{INPUT_CSV_FILE}' not found. Please create it or verify the path.")
         return
 
     print(f"[+] Loading input file: {INPUT_CSV_FILE}")
-    df = pd.read_csv(INPUT_CSV_FILE)
-    df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
-    df.columns = [c.strip() for c in df.columns]
-
-    platform_col = "Platform" if "Platform" in df.columns else df.columns[2]
-    url_col = "ProfileURL" if "ProfileURL" in df.columns else df.columns[0]
+    df = load_and_clean_csv(INPUT_CSV_FILE)
+    platform_col, url_col = get_column_names(df)
 
     # Filter strictly for Facebook rows
-    fb_mask = (
-        df[platform_col].astype(str).str.strip().str.lower().isin(["facebook", "fb"]) |
-        df[url_col].astype(str).str.contains("facebook.com", case=False, na=False)
-    )
-
-    fb_rows = df[fb_mask].copy()
+    fb_rows = filter_platform_rows(df, platform_col, url_col, "facebook", "facebook.com")
+    if limit is not None:
+        fb_rows = fb_rows.head(limit)
     print(f"[+] Found {len(fb_rows)} Facebook profiles to scrape.\n")
 
     if fb_rows.empty:
@@ -196,26 +193,10 @@ def main():
             url = str(row[url_col]).strip()
             print(f"[{idx}/{len(fb_rows)}] Scraping Facebook: {url}")
 
-            scraped_data = scrape_facebook_profile(page, url)
-
+            scraped_data = scrape_facebook_profile(page, url, model_provider=model_provider, model_name=model_name)
             row_dict = row.to_dict()
             row_dict["Platform"] = "Facebook"
-
-            if scraped_data:
-                row_dict["Name/Handle"] = scraped_data["Handle"]
-                row_dict["FollowerCount"] = scraped_data["FollowerCount"]
-                if row_dict.get("Email") in [None, "", "not exposed"]:
-                    row_dict["Email"] = scraped_data["Email"]
-                row_dict["LastScrapedAt"] = scraped_data["LastScrapedAt"]
-                row_dict["Language"] = scraped_data["Language"]
-                row_dict["PrimaryAITool"] = scraped_data["PrimaryAITool"] or row_dict.get("PrimaryAITool")
-                row_dict["SampleContentURL"] = scraped_data["SampleContentURL"] or row_dict.get("SampleContentURL")
-                row_dict["AIGCVerdict"] = scraped_data["AIGCVerdict"]
-                row_dict["Notes"] = scraped_data["Notes"]
-                row_dict["FeedURL"] = scraped_data["FeedURL"]
-                row_dict["ContactSourceURL"] = scraped_data["ContactSourceURL"]
-                row_dict["EvidenceJSON"] = scraped_data["EvidenceJSON"]
-
+            row_dict = merge_scraped_row(row_dict, scraped_data)
             updated_rows.append(row_dict)
             time.sleep(2)  # Wait 2s to avoid aggressive Facebook IP throttling
 
@@ -223,19 +204,15 @@ def main():
 
     # Save to CSV
     final_df = pd.DataFrame(updated_rows)
-    target_columns = [
-        "ProfileURL", "Name/Handle", "Platform", "FollowerCount", "Email", "Tags",
-        "OutreachStatus", "LastScrapedAt", "Region", "Language", "PrimaryAITool",
-        "SampleContentURL", "AIGCVerdict", "DiscoveredAt", "Source", "Notes",
-        "FeedURL", "ContactSourceURL", "EvidenceJSON"
-    ]
-    for col in target_columns:
-        if col not in final_df.columns:
-            final_df[col] = None
-
-    final_df = final_df[target_columns]
+    final_df = enforce_target_columns(final_df)
     final_df.to_csv(OUTPUT_CSV_FILE, index=False)
     print(f"\n[✓] Completed! Saved {len(final_df)} Facebook records to '{OUTPUT_CSV_FILE}'.")
 
+
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--limit", type=int, default=None, help="Max Facebook profiles to process")
+    parser.add_argument("--model-provider", type=str, default=None, help="Override MODEL_PROVIDER for this run")
+    parser.add_argument("--model-name", type=str, default=None, help="Override MODEL_NAME for this run")
+    args = parser.parse_args()
+    main(limit=args.limit, model_provider=args.model_provider, model_name=args.model_name)

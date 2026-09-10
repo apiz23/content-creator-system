@@ -1,6 +1,7 @@
 import os
 import re
 import json
+import argparse
 import time
 import requests
 import pandas as pd
@@ -17,7 +18,7 @@ INPUT_CSV_FILE = PROJECT_ROOT / "data/input/input_channels.csv"
 OUTPUT_CSV_FILE = PROJECT_ROOT / "data/output/threads_scraped_output.csv"
 
 # 1. AI Classifier
-def classify_with_local_llm(bio: str, handle: str):
+def classify_with_local_llm(bio: str, handle: str, model_provider=None, model_name=None):
     prompt = f"""
     Analyze this Threads creator's handle and bio.
     Handle: {handle}
@@ -33,7 +34,7 @@ def classify_with_local_llm(bio: str, handle: str):
     }}
     """
     try:
-        response_text = call_model(prompt, format="json", timeout=15)
+        response_text = call_model(prompt, format="json", timeout=15, model_provider=model_provider, model_name=model_name)
         return json.loads(response_text)
     except Exception:
         combined = f"{handle} {bio}".lower()
@@ -64,7 +65,7 @@ def extract_threads_username(raw_val: str):
     return f"@{val}"
 
 # 2. Standalone Threads Scraper via Playwright
-def scrape_threads_profile(page, profile_url: str):
+def scrape_threads_profile(page, profile_url: str, model_provider=None, model_name=None):
     try:
         page.goto(profile_url, wait_until="domcontentloaded", timeout=25000)
         time.sleep(2.5)  # Allow dynamic client rendering
@@ -105,7 +106,7 @@ def scrape_threads_profile(page, profile_url: str):
             pass
 
         # AI Classification
-        ai_meta = classify_with_local_llm(bio, handle or "")
+        ai_meta = classify_with_local_llm(bio, handle or "", model_provider=model_provider, model_name=model_name)
         email = extract_email(bio)
 
         evidence = {
@@ -138,8 +139,8 @@ def scrape_threads_profile(page, profile_url: str):
         return None
 
 # --- 3. BATCH PROCESSOR ---
-def main():
-    if not os.path.exists(INPUT_CSV_FILE):
+def main(limit=None, model_provider=None, model_name=None):
+    if not INPUT_CSV_FILE.exists():
         print(f"[!] File '{INPUT_CSV_FILE}' not found. Please create it or verify the path.")
         return
 
@@ -178,7 +179,7 @@ def main():
             url = str(row[url_col]).strip()
             print(f"[{idx}/{len(threads_rows)}] Scraping Threads: {url}")
 
-            scraped_data = scrape_threads_profile(page, url)
+            scraped_data = scrape_threads_profile(page, url, model_provider=model_provider, model_name=model_name)
 
             row_dict = row.to_dict()
             row_dict["Platform"] = "Threads"
@@ -220,4 +221,9 @@ def main():
     print(f"\n[✓] Completed! Saved {len(final_df)} Threads records to '{OUTPUT_CSV_FILE}'.")
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--limit", type=int, default=None, help="Max Threads profiles to process")
+    parser.add_argument("--model-provider", type=str, default=None, help="Override MODEL_PROVIDER for this run")
+    parser.add_argument("--model-name", type=str, default=None, help="Override MODEL_NAME for this run")
+    args = parser.parse_args()
+    main(limit=args.limit, model_provider=args.model_provider, model_name=args.model_name)

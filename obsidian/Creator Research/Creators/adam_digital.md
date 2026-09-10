@@ -1,56 +1,47 @@
 ---
-name: adam.digital
+name: @adam.digital
 handle: @adam.digital
 platform: TikTok
 profile_url: https://www.tiktok.com/@adam.digital
-followers: 532.3K
-email: hello@adamgodigital.com
+followers: 532.2K
 category: AIGC,TikTok,AI,marketing,productivity
 language: English
 region: Malaysia
 ai_tools: GenAI
-status: Scraped
+status: active
 discovered_at: 2026-09-02T05:21:02Z
-last_scraped_at: 2026-09-03T02:26:44Z
-last_verified: 2026-09-03
+last_verified: 2026-09-09T03:18:44Z
+last_scraped_at: 2026-09-09T03:18:44Z
 ---
 
-# adam.digital (@adam.digital)
+# @adam.digital
 
 ## Profile
-
 - **Handle:** @adam.digital
 - **Platform:** TikTok
 - **Profile URL:** https://www.tiktok.com/@adam.digital
-- **Follower Count:** 532.3K
-- **Region:** Malaysia
-- **Language:** English
+- **Follower Count:** 532.2K
 
 ## AI / Content
-
-- **AIGC Verdict:** yes
 - **Primary AI Tool:** GenAI
+- **AIGC Verdict:** yes
+- **Language:** English
 - **Tags:** AIGC,TikTok,AI,marketing,productivity
 
 ## Contact
-
 - **Email:** hello@adamgodigital.com
 - **Contact Source:** https://www.tiktok.com/@adam.digital
 
 ## Evidence
-
 - **Source:** FeedSpot Top 40 AI TikTok Influencers 2026
-- **Scraped At:** 2026-09-03T02:26:44Z
-- **Bio Preview:** 🔥AI educator for Entrepreneurs/ Creators
-📧hello@adamgodigital.com
-Work with us ⬇️
-- **External Link:** https://www.tiktok.com/@adam.digital
+- **Sample Content:** pop.store/adamdigital
+- **Evidence:** TikTok scrape: followers=532.2K; bio_link=pop.store/adamdigital
 
-## Notes
-
-TikTok scrape: followers=532.3K; bio_link=pop.store/adamdigital
+## Research Notes
+- **Last Scraped:** 2026-09-09T03:18:44Z
+- **Notes:** TikTok scrape: followers=532.2K; bio_link=pop.store/adamdigital
 
 ## Related
 
 - [[Platforms/TikTok]]
-- [[Daily/2026-09-03]]
+- [[Daily/2026-09-09]]

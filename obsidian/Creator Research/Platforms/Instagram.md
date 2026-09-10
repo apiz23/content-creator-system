@@ -3,7 +3,7 @@ name: Instagram
 platform: Instagram
 type: Social Media Platform
 status: Active
-last_discovery: 2026-09-04
+last_discovery: 2026-09-09
 last_scrape: 2026-09-03
 ---
 
@@ -21,6 +21,16 @@ Discovered 4 new Instagram creators via FeedSpot Top 40 AI Artists Instagram Inf
 - [[@rowan_lewgalon_aiart]] — Rowan, AI artist, Nightcafe Studio Ambassador, 118.6K followers (Macro)
 - [[@juliewdesign]] — Julie W. Design, traditional + generative AI art, 25.3K followers, +22% growth (Micro)
 - [[@poetofcode]] — Dr. Joy Buolamwini, AI ethics leader, MIT PhD, Algorithmic Justice League founder, 33.5K followers (Micro)
+
+## Discovery (2026-09-09)
+
+Discovered 5 new Instagram creators via FeedSpot, Kolsquare, The Daring Creators, and Hyax:
+
+- [[@troplanduniverse]] — Josh Gottsegen, AI wildlife/cinematic art, 1.4M followers, collaborations with Meta, Adobe, OpenAI, Sora, Kling
+- [[@annawessenart]] — Anna Wessen, Visual Artist | AI Creative Director, 62.5K followers, Los Angeles
+- [[@grannyspills]] — AI-generated 75-year-old influencer by Blur Studios, 2M followers, Veo3, luxury lifestyle
+- [[@fit_aitana]] — Aitana Lopez, Spanish AI fashion influencer, 404K followers, created by The Clueless Agency
+- [[@surreailist]] — Lukas Nowacki, "psychological descents" AI films, Berlin Music Video Awards 2026 jury, Kinovi AI
 
 ## Discovery (2026-09-04)
 

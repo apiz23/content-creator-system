@@ -1,51 +1,47 @@
 ---
-name: Rajiv Shah
-handle: rajistics
+name: @rajistics
+handle: @rajistics
 platform: TikTok
 profile_url: https://www.tiktok.com/@rajistics
-https://www.tiktok.com/@rajistics
 followers: 31.3K
-31.2K
-email: not exposed
-category: AIGC, AI Fun, Agent Engineering
-language: en
+category: AIGC,TikTok,AI fun,agent engineering
+language: English
 region: US
 ai_tools: Kling
-OpenHands
-status: Scraped
-discovered
-last_verified: 2026-09-08T05:31:05Z
-2026-09-04
+status: active
+discovered_at: 2026-09-04T00:52:16Z
+last_verified: 2026-09-09T03:22:00Z
+last_scraped_at: 2026-09-09T03:22:00Z
 ---
 
-# Rajiv Shah
+# @rajistics
 
 ## Profile
-
+- **Handle:** @rajistics
 - **Platform:** TikTok
 - **Profile URL:** https://www.tiktok.com/@rajistics
-- **Followers:** 31.3K (scraped 2026-09-04, Playwright)
-- **Region:** US
-- **Language:** en
+- **Follower Count:** 31.3K
 
-## Content
+## AI / Content
+- **Primary AI Tool:** Kling
+- **AIGC Verdict:** yes
+- **Language:** English
+- **Tags:** AIGC,TikTok,AI fun,agent engineering
 
-- **Niche:** AI entertainment, agent engineering
-- **Bio:** Sprinkling AI with Fun. Agent Engineering at OpenHands.
-- **Type:** Micro influencer
-
-## AI / Technology
-
-- **Primary AI Tool:** OpenHands (agent engineering)
-- **AIGC Verdict:** unsure (discovery-only, FeedSpot source)
+## Contact
+- **Email:** not exposed
+- **Contact Source:** rajivshah.com
 
 ## Evidence
+- **Source:** FeedSpot Top 40 AI TikTok Influencers Aug 2026
+- **Sample Content:** rajivshah.com
+- **Evidence:** TikTok scrape: followers=31.3K; bio_link=rajivshah.com
 
-- **Source:** FeedSpot Top 40 AI TikTok Influencers (Aug 19, 2026)
-  - URL: https://creators.feedspot.com/ai_tiktok_influencers/
-- **Sample Content:** https://www.tiktok.com/@rajistics
+## Research Notes
+- **Last Scraped:** 2026-09-09T03:22:00Z
+- **Notes:** TikTok scrape: followers=31.3K; bio_link=rajivshah.com
 
 ## Related
 
-- [[TikTok]]
-- [[2026-09-04]]
+- [[Platforms/TikTok]]
+- [[Daily/2026-09-09]]

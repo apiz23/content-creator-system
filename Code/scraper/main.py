@@ -6,17 +6,23 @@ import pandas as pd
 from datetime import datetime
 import yt_dlp
 from pathlib import Path
+import argparse
 
 from model_client import call_model
-
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+from common import (
+    PROJECT_ROOT, INPUT_CSV_FILE, TARGET_COLUMNS,
+    load_and_clean_csv, get_column_names, enforce_target_columns,
+    merge_scraped_row, extract_email, filter_platform_rows
+)
 
 # --- CONFIGURATION ---
-INPUT_CSV_FILE = PROJECT_ROOT / "data/input/input_channels.csv"
 OUTPUT_CSV_FILE = PROJECT_ROOT / "data/output/youtube_refreshed_output.csv"
 
-# 1. AI Classifier
-def classify_with_local_llm(bio: str, sample_text: str):
+
+def classify_with_local_llm(bio: str, sample_text: str, model_provider=None, model_name=None):
+    """
+    Analyze creator's bio and sample content using local LLM.
+    """
     prompt = f"""
     Analyze this creator's bio and sample content.
     Bio: {bio}
@@ -32,7 +38,7 @@ def classify_with_local_llm(bio: str, sample_text: str):
     }}
     """
     try:
-        response_text = call_model(prompt, format="json", timeout=15)
+        response_text = call_model(prompt, format="json", timeout=15, model_provider=model_provider, model_name=model_name)
         return json.loads(response_text)
     except Exception:
         # Smart fallback if Ollama is not active
@@ -46,11 +52,6 @@ def classify_with_local_llm(bio: str, sample_text: str):
             "Evidence": "Rule-based keyword extraction fallback"
         }
 
-def extract_email(text: str):
-    if not text:
-        return "not exposed"
-    match = re.search(r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+', text)
-    return match.group(0) if match else "not exposed"
 
 # 2. YouTube Live Scraper via yt-dlp
 def scrape_youtube_channel(channel_url: str):
@@ -115,6 +116,7 @@ def scrape_youtube_channel(channel_url: str):
             }
 
             return {
+                "Handle": channel_name,
                 "FollowerCount": sub_count,
                 "Email": email,
                 "Tags": ", ".join(ai_meta.get("Tags", [])) if isinstance(ai_meta.get("Tags"), list) else str(ai_meta.get("Tags")),
@@ -132,33 +134,23 @@ def scrape_youtube_channel(channel_url: str):
         print(f"[-] Error scraping {channel_url}: {e}")
         return None
 
+
 # --- MAIN RUNNER ---
-def main():
-    if not os.path.exists(INPUT_CSV_FILE):
+def main(limit=None, model_provider=None, model_name=None):
+    if not INPUT_CSV_FILE.exists():
         print(f"[!] File '{INPUT_CSV_FILE}' not found. Please verify the filename.")
         return
 
     print(f"[+] Loading input file: {INPUT_CSV_FILE}")
-    
-    # Read CSV and drop any empty trailing unnamed columns
-    df = pd.read_csv(INPUT_CSV_FILE)
-    df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
-
-    # Normalize column names (strip leading/trailing whitespace)
-    df.columns = [c.strip() for c in df.columns]
+    df = load_and_clean_csv(INPUT_CSV_FILE)
+    platform_col, url_col = get_column_names(df)
 
     print(f"[+] Total rows in CSV: {len(df)}")
 
-    # Filter for YouTube: Column C ('Platform') is 'YouTube' or URL contains 'youtube.com'
-    platform_col = "Platform" if "Platform" in df.columns else df.columns[2]
-    url_col = "ProfileURL" if "ProfileURL" in df.columns else df.columns[0]
-
-    youtube_mask = (
-        df[platform_col].astype(str).str.strip().str.lower().isin(["youtube", "yt"]) |
-        df[url_col].astype(str).str.contains("youtube.com", case=False, na=False)
-    )
-
-    yt_rows = df[youtube_mask].copy()
+    # Filter for YouTube
+    yt_rows = filter_platform_rows(df, platform_col, url_col, "youtube", "youtube.com")
+    if limit is not None:
+        yt_rows = yt_rows.head(limit)
     print(f"[+] Identified {len(yt_rows)} YouTube channel rows to scrape.\n")
 
     updated_rows = []
@@ -167,43 +159,22 @@ def main():
         print(f"[{idx}/{len(yt_rows)}] Scraping YouTube profile: {url}")
         
         scraped_data = scrape_youtube_channel(url)
-        
         row_dict = row.to_dict()
-        row_dict["Platform"] = "YouTube"  # Ensure Column C is populated with YouTube
-        
-        if scraped_data:
-            # Update fields with fresh scraped data
-            row_dict["FollowerCount"] = scraped_data["FollowerCount"]
-            if row_dict.get("Email") in [None, "", "not exposed"]:
-                row_dict["Email"] = scraped_data["Email"]
-            row_dict["LastScrapedAt"] = scraped_data["LastScrapedAt"]
-            row_dict["PrimaryAITool"] = scraped_data["PrimaryAITool"] or row_dict.get("PrimaryAITool")
-            row_dict["SampleContentURL"] = scraped_data["SampleContentURL"] or row_dict.get("SampleContentURL")
-            row_dict["AIGCVerdict"] = scraped_data["AIGCVerdict"]
-            row_dict["Notes"] = scraped_data["Notes"]
-            row_dict["FeedURL"] = scraped_data["FeedURL"]
-            row_dict["ContactSourceURL"] = scraped_data["ContactSourceURL"]
-            row_dict["EvidenceJSON"] = scraped_data["EvidenceJSON"]
-        
+        row_dict["Platform"] = "YouTube"
+        row_dict = merge_scraped_row(row_dict, scraped_data)
         updated_rows.append(row_dict)
 
     # Convert to DataFrame with exact column order
     final_df = pd.DataFrame(updated_rows)
-    
-    target_columns = [
-        "ProfileURL", "Name/Handle", "Platform", "FollowerCount", "Email", "Tags",
-        "OutreachStatus", "LastScrapedAt", "Region", "Language", "PrimaryAITool",
-        "SampleContentURL", "AIGCVerdict", "DiscoveredAt", "Source", "Notes",
-        "FeedURL", "ContactSourceURL", "EvidenceJSON"
-    ]
-    
-    for col in target_columns:
-        if col not in final_df.columns:
-            final_df[col] = None
-            
-    final_df = final_df[target_columns]
+    final_df = enforce_target_columns(final_df)
     final_df.to_csv(OUTPUT_CSV_FILE, index=False)
     print(f"\n[✓] Completed! Successfully scraped and saved YouTube records to '{OUTPUT_CSV_FILE}'.")
 
+
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--limit", type=int, default=None, help="Max YouTube channels to process")
+    parser.add_argument("--model-provider", type=str, default=None, help="Override MODEL_PROVIDER for this run")
+    parser.add_argument("--model-name", type=str, default=None, help="Override MODEL_NAME for this run")
+    args = parser.parse_args()
+    main(limit=args.limit, model_provider=args.model_provider, model_name=args.model_name)

@@ -1,63 +1,47 @@
 ---
-name: fawziammache
+name: @fawziammache
 handle: @fawziammache
 platform: TikTok
 profile_url: https://www.tiktok.com/@fawziammache
-https://www.tiktok.com/@fawziammache
 followers: 133.4K
-133.4K
-email: Not publicly available
-category: AIGC,TikTok,AI explainer,design
+category: AIGC,TikTok,AI motivation
 language: English
-region: Canada
+region: nan
 ai_tools: GenAI
-GenAI
-status: Scraped
-Scraped
-discovered_at: 2026-09-03T02:06:12Z
-last_scraped_at: 2026-09-08T05:29:37Z
-2026-09-03T02:28:31Z
-last_verified: 2026-09-08T05:29:37Z
-2026-09-03
+status: active
+discovered_at: 2026-09-01
+last_verified: 2026-09-09T03:15:13Z
+last_scraped_at: 2026-09-09T03:15:13Z
 ---
 
-# fawziammache (@fawziammache)
+# @fawziammache
 
 ## Profile
-
 - **Handle:** @fawziammache
 - **Platform:** TikTok
 - **Profile URL:** https://www.tiktok.com/@fawziammache
 - **Follower Count:** 133.4K
-- **Region:** Canada
-- **Language:** English
 
 ## AI / Content
-
-- **AIGC Verdict:** yes
 - **Primary AI Tool:** GenAI
-- **Tags:** AIGC,TikTok,AI explainer,design
+- **AIGC Verdict:** yes
+- **Language:** English
+- **Tags:** AIGC,TikTok,AI motivation
 
 ## Contact
-
-- **Email:** Not publicly available
-- **Contact Source:** https://www.tiktok.com/@fawziammache
+- **Email:** nan
+- **Contact Source:** futurewithfawzi.com/links
 
 ## Evidence
-
 - **Source:** web_search: Feedspot Top 40 AI TikTok Influencers 2026
-- **Scraped At:** 2026-09-03T02:28:31Z
-- **Bio Preview:** 📍Toronto // 🇱🇧🇨🇦
-⚙️ Designer & Engineer
-🤖 Explaining AI without the hype
-✍️ 100% hand-drawn visuals
-- **External Link:** https://www.tiktok.com/@fawziammache
+- **Sample Content:** futurewithfawzi.com/links
+- **Evidence:** TikTok scrape: followers=133.4K; bio_link=futurewithfawzi.com/links
 
-## Notes
-
-TikTok scrape: followers=133.4K; bio_link=futurewithfawzi.com/links
+## Research Notes
+- **Last Scraped:** 2026-09-09T03:15:13Z
+- **Notes:** TikTok scrape: followers=133.4K; bio_link=futurewithfawzi.com/links
 
 ## Related
 
 - [[Platforms/TikTok]]
-- [[Daily/2026-09-03]]
+- [[Daily/2026-09-09]]

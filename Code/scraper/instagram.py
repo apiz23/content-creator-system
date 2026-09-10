@@ -7,15 +7,23 @@ import pandas as pd
 from datetime import datetime
 from playwright.sync_api import sync_playwright
 from pathlib import Path
+import argparse
 
 from model_client import call_model
+from common import (
+    PROJECT_ROOT, INPUT_CSV_FILE, TARGET_COLUMNS,
+    load_and_clean_csv, get_column_names, enforce_target_columns,
+    merge_scraped_row, extract_email, filter_platform_rows
+)
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-
-INPUT_CSV_FILE = PROJECT_ROOT / "data/input/input_channels.csv"
+# --- CONFIGURATION ---
 OUTPUT_CSV_FILE = PROJECT_ROOT / "data/output/instagram_scraped_output.csv"
 
-def classify_with_local_llm(bio: str, handle: str):
+
+def classify_with_local_llm(bio: str, handle: str, model_provider=None, model_name=None):
+    """
+    Analyze Instagram creator's handle and bio using local LLM.
+    """
     prompt = f"""
     Analyze this Instagram creator's handle and bio.
     Handle: {handle}
@@ -31,7 +39,7 @@ def classify_with_local_llm(bio: str, handle: str):
     }}
     """
     try:
-        response_text = call_model(prompt, format="json", timeout=15)
+        response_text = call_model(prompt, format="json", timeout=15, model_provider=model_provider, model_name=model_name)
         return json.loads(response_text)
     except Exception:
         combined = f"{handle} {bio}".lower()
@@ -44,13 +52,8 @@ def classify_with_local_llm(bio: str, handle: str):
             "Evidence": "Rule-based fallback"
         }
 
-def extract_email(text: str):
-    if not text:
-        return "not exposed"
-    match = re.search(r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+', str(text))
-    return match.group(0) if match else "not exposed"
 
-def scrape_instagram_playwright(page, profile_url: str):
+def scrape_instagram_playwright(page, profile_url: str, model_provider=None, model_name=None):
     try:
         page.goto(profile_url, wait_until="domcontentloaded", timeout=25000)
         time.sleep(2.5)
@@ -93,7 +96,7 @@ def scrape_instagram_playwright(page, profile_url: str):
         handle = f"@{handle_match.group(1).replace('/', '')}" if handle_match else profile_url.split('/')[-1]
 
         # 3. AI classification & Email extraction
-        ai_meta = classify_with_local_llm(bio, handle)
+        ai_meta = classify_with_local_llm(bio, handle, model_provider=model_provider, model_name=model_name)
         email = extract_email(bio)
 
         evidence = {
@@ -122,20 +125,20 @@ def scrape_instagram_playwright(page, profile_url: str):
         print(f"[-] Playwright error on {profile_url}: {e}")
         return None
 
-def main():
-    df = pd.read_csv(INPUT_CSV_FILE)
-    df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
-    df.columns = [c.strip() for c in df.columns]
 
-    platform_col = "Platform" if "Platform" in df.columns else df.columns[2]
-    url_col = "ProfileURL" if "ProfileURL" in df.columns else df.columns[0]
+def main(limit=None, model_provider=None, model_name=None):
+    if not INPUT_CSV_FILE.exists():
+        print(f"[!] File '{INPUT_CSV_FILE}' not found. Please create it or verify the path.")
+        return
 
-    ig_mask = (
-        df[platform_col].astype(str).str.strip().str.lower().isin(["instagram", "ig"]) |
-        df[url_col].astype(str).str.contains("instagram.com", case=False, na=False)
-    )
+    print(f"[+] Loading input file: {INPUT_CSV_FILE}")
+    df = load_and_clean_csv(INPUT_CSV_FILE)
+    platform_col, url_col = get_column_names(df)
 
-    ig_rows = df[ig_mask].copy()
+    # Filter strictly for Instagram rows
+    ig_rows = filter_platform_rows(df, platform_col, url_col, "instagram", "instagram.com")
+    if limit is not None:
+        ig_rows = ig_rows.head(limit)
     print(f"[+] Found {len(ig_rows)} Instagram profiles to scrape with Playwright.\n")
 
     updated_rows = []
@@ -150,44 +153,25 @@ def main():
             url = str(row[url_col]).strip()
             print(f"[{idx}/{len(ig_rows)}] Scraping Instagram: {url}")
 
-            scraped_data = scrape_instagram_playwright(page, url)
+            scraped_data = scrape_instagram_playwright(page, url, model_provider=model_provider, model_name=model_name)
             row_dict = row.to_dict()
             row_dict["Platform"] = "Instagram"
-
-            if scraped_data:
-                row_dict["Name/Handle"] = scraped_data["Handle"]
-                row_dict["FollowerCount"] = scraped_data["FollowerCount"]
-                if row_dict.get("Email") in [None, "", "not exposed"]:
-                    row_dict["Email"] = scraped_data["Email"]
-                row_dict["LastScrapedAt"] = scraped_data["LastScrapedAt"]
-                row_dict["Language"] = scraped_data["Language"]
-                row_dict["PrimaryAITool"] = scraped_data["PrimaryAITool"] or row_dict.get("PrimaryAITool")
-                row_dict["SampleContentURL"] = scraped_data["SampleContentURL"] or row_dict.get("SampleContentURL")
-                row_dict["AIGCVerdict"] = scraped_data["AIGCVerdict"]
-                row_dict["Notes"] = scraped_data["Notes"]
-                row_dict["FeedURL"] = scraped_data["FeedURL"]
-                row_dict["ContactSourceURL"] = scraped_data["ContactSourceURL"]
-                row_dict["EvidenceJSON"] = scraped_data["EvidenceJSON"]
-
+            row_dict = merge_scraped_row(row_dict, scraped_data)
             updated_rows.append(row_dict)
             time.sleep(3)  # Wait 3 seconds between profiles
 
         browser.close()
 
     final_df = pd.DataFrame(updated_rows)
-    target_columns = [
-        "ProfileURL", "Name/Handle", "Platform", "FollowerCount", "Email", "Tags",
-        "OutreachStatus", "LastScrapedAt", "Region", "Language", "PrimaryAITool",
-        "SampleContentURL", "AIGCVerdict", "DiscoveredAt", "Source", "Notes",
-        "FeedURL", "ContactSourceURL", "EvidenceJSON"
-    ]
-    for col in target_columns:
-        if col not in final_df.columns:
-            final_df[col] = None
-
-    final_df = final_df[target_columns]
+    final_df = enforce_target_columns(final_df)
     final_df.to_csv(OUTPUT_CSV_FILE, index=False)
     print(f"\n[✓] Completed! Saved to '{OUTPUT_CSV_FILE}'.")
 
+
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--limit", type=int, default=None, help="Max Instagram profiles to process")
+    parser.add_argument("--model-provider", type=str, default=None, help="Override MODEL_PROVIDER for this run")
+    parser.add_argument("--model-name", type=str, default=None, help="Override MODEL_NAME for this run")
+    args = parser.parse_args()
+    main(limit=args.limit, model_provider=args.model_provider, model_name=args.model_name)

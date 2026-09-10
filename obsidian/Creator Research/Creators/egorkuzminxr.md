@@ -1,60 +1,47 @@
 ---
-name: egorkuzminxr
+name: @egorkuzminxr
 handle: @egorkuzminxr
 platform: TikTok
 profile_url: https://tiktok.com/@egorkuzminxr
-https://tiktok.com/@egorkuzminxr
 followers: 53.8K
-53.8K
-email: Not publicly available
 category: AIGC,Sora
 language: English
-region: 
+region: nan
 ai_tools: GenAI
-GenAI
-status: Scraped
-Scraped
+status: active
 discovered_at: 2026-08-06T14:13:11Z
-last_scraped_at: 2026-09-08T05:22:49Z
-2026-09-03T02:21:44Z
-last_verified: 2026-09-08T05:22:49Z
-2026-09-03
+last_verified: 2026-09-09T03:13:45Z
+last_scraped_at: 2026-09-09T03:13:45Z
 ---
 
-# egorkuzminxr (@egorkuzminxr)
+# @egorkuzminxr
 
 ## Profile
-
 - **Handle:** @egorkuzminxr
 - **Platform:** TikTok
 - **Profile URL:** https://tiktok.com/@egorkuzminxr
 - **Follower Count:** 53.8K
-- **Region:** 
-- **Language:** English
 
 ## AI / Content
-
-- **AIGC Verdict:** hybrid
 - **Primary AI Tool:** GenAI
+- **AIGC Verdict:** hybrid
+- **Language:** English
 - **Tags:** AIGC,Sora
 
 ## Contact
-
-- **Email:** Not publicly available
-- **Contact Source:** https://tiktok.com/@egorkuzminxr
+- **Email:** nan
+- **Contact Source:** t.me/EgorKuzminXR1
 
 ## Evidence
-
 - **Source:** off-platform sweep (ddgs): "AI filmmaker" Sora site:tiktok.com/@
-- **Scraped At:** 2026-09-03T02:21:44Z
-- **Bio Preview:** Егор Кузьмин | Специалист по нейросетям
-- **External Link:** https://tiktok.com/@egorkuzminxr
+- **Sample Content:** t.me/EgorKuzminXR1
+- **Evidence:** TikTok scrape: followers=53.8K; bio_link=t.me/EgorKuzminXR1
 
-## Notes
-
-TikTok scrape: followers=53.8K; bio_link=t.me/EgorKuzminXR1
+## Research Notes
+- **Last Scraped:** 2026-09-09T03:13:45Z
+- **Notes:** TikTok scrape: followers=53.8K; bio_link=t.me/EgorKuzminXR1
 
 ## Related
 
 - [[Platforms/TikTok]]
-- [[Daily/2026-09-03]]
+- [[Daily/2026-09-09]]

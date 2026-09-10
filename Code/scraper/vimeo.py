@@ -7,17 +7,23 @@ import pandas as pd
 from datetime import datetime
 import yt_dlp
 from pathlib import Path
+import argparse
 
 from model_client import call_model
-
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+from common import (
+    PROJECT_ROOT, INPUT_CSV_FILE, TARGET_COLUMNS,
+    load_and_clean_csv, get_column_names, enforce_target_columns,
+    merge_scraped_row, extract_email, filter_platform_rows
+)
 
 # --- CONFIGURATION ---
-INPUT_CSV_FILE = PROJECT_ROOT / "data/input/input_channels.csv"
 OUTPUT_CSV_FILE = PROJECT_ROOT / "data/output/vimeo_scraped_output.csv"
 
-# 1. AI Classifier
-def classify_with_local_llm(bio: str, sample_text: str, username: str):
+
+def classify_with_local_llm(bio: str, sample_text: str, username: str, model_provider=None, model_name=None):
+    """
+    Analyze Vimeo filmmaker/creator's profile and video sample using local LLM.
+    """
     prompt = f"""
     Analyze this Vimeo filmmaker/creator's profile and video sample:
     Username: {username}
@@ -35,7 +41,7 @@ def classify_with_local_llm(bio: str, sample_text: str, username: str):
     }}
     """
     try:
-        response_text = call_model(prompt, format="json", timeout=15)
+        response_text = call_model(prompt, format="json", timeout=15, model_provider=model_provider, model_name=model_name)
         return json.loads(response_text)
     except Exception:
         combined = f"{username} {bio} {sample_text}".lower()
@@ -49,11 +55,6 @@ def classify_with_local_llm(bio: str, sample_text: str, username: str):
             "Evidence": "Rule-based keyword fallback"
         }
 
-def extract_email(text: str):
-    if not text:
-        return "not exposed"
-    match = re.search(r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+', str(text))
-    return match.group(0) if match else "not exposed"
 
 def extract_vimeo_handle(raw_url: str):
     if not isinstance(raw_url, str) or not raw_url.strip():
@@ -64,8 +65,9 @@ def extract_vimeo_handle(raw_url: str):
         return f"@{match.group(1)}"
     return f"@{url.split('/')[-1]}"
 
+
 # 2. Vimeo Profile & Video Scraper via yt-dlp & OpenGraph
-def scrape_vimeo_profile(channel_url: str):
+def scrape_vimeo_profile(channel_url: str, model_provider=None, model_name=None):
     ydl_opts = {
         'quiet': True,
         'extract_flat': True,
@@ -115,7 +117,7 @@ def scrape_vimeo_profile(channel_url: str):
         follower_metric = f"{video_count} videos" if video_count else "N/A"
 
         # AI Classification & Contact Extraction
-        ai_meta = classify_with_local_llm(description, sample_title, uploader_name)
+        ai_meta = classify_with_local_llm(description, sample_title, uploader_name, model_provider=model_provider, model_name=model_name)
         email = extract_email(description)
 
         evidence = {
@@ -149,27 +151,21 @@ def scrape_vimeo_profile(channel_url: str):
         print(f"[-] Error scraping Vimeo URL {channel_url}: {e}")
         return None
 
+
 # --- 3. BATCH PROCESSOR ---
-def main():
-    if not os.path.exists(INPUT_CSV_FILE):
+def main(limit=None, model_provider=None, model_name=None):
+    if not INPUT_CSV_FILE.exists():
         print(f"[!] File '{INPUT_CSV_FILE}' not found. Please create it or verify the path.")
         return
 
     print(f"[+] Loading input file: {INPUT_CSV_FILE}")
-    df = pd.read_csv(INPUT_CSV_FILE)
-    df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
-    df.columns = [c.strip() for c in df.columns]
-
-    platform_col = "Platform" if "Platform" in df.columns else df.columns[2]
-    url_col = "ProfileURL" if "ProfileURL" in df.columns else df.columns[0]
+    df = load_and_clean_csv(INPUT_CSV_FILE)
+    platform_col, url_col = get_column_names(df)
 
     # Filter strictly for Vimeo rows
-    vimeo_mask = (
-        df[platform_col].astype(str).str.strip().str.lower().isin(["vimeo", "vm"]) |
-        df[url_col].astype(str).str.contains("vimeo.com", case=False, na=False)
-    )
-
-    vimeo_rows = df[vimeo_mask].copy()
+    vimeo_rows = filter_platform_rows(df, platform_col, url_col, "vimeo", "vimeo.com")
+    if limit is not None:
+        vimeo_rows = vimeo_rows.head(limit)
     print(f"[+] Found {len(vimeo_rows)} Vimeo profiles/channels to scrape.\n")
 
     if vimeo_rows.empty:
@@ -181,45 +177,24 @@ def main():
         url = str(row[url_col]).strip()
         print(f"[{idx}/{len(vimeo_rows)}] Scraping Vimeo: {url}")
 
-        scraped_data = scrape_vimeo_profile(url)
-
+        scraped_data = scrape_vimeo_profile(url, model_provider=model_provider, model_name=model_name)
         row_dict = row.to_dict()
         row_dict["Platform"] = "Vimeo"
-
-        if scraped_data:
-            row_dict["Name/Handle"] = scraped_data["Handle"]
-            row_dict["FollowerCount"] = scraped_data["FollowerCount"]
-            if row_dict.get("Email") in [None, "", "not exposed"]:
-                row_dict["Email"] = scraped_data["Email"]
-            row_dict["LastScrapedAt"] = scraped_data["LastScrapedAt"]
-            row_dict["Region"] = scraped_data["Region"] or row_dict.get("Region")
-            row_dict["Language"] = scraped_data["Language"]
-            row_dict["PrimaryAITool"] = scraped_data["PrimaryAITool"] or row_dict.get("PrimaryAITool")
-            row_dict["SampleContentURL"] = scraped_data["SampleContentURL"] or row_dict.get("SampleContentURL")
-            row_dict["AIGCVerdict"] = scraped_data["AIGCVerdict"]
-            row_dict["Notes"] = scraped_data["Notes"]
-            row_dict["FeedURL"] = scraped_data["FeedURL"]
-            row_dict["ContactSourceURL"] = scraped_data["ContactSourceURL"]
-            row_dict["EvidenceJSON"] = scraped_data["EvidenceJSON"]
-
+        row_dict = merge_scraped_row(row_dict, scraped_data)
         updated_rows.append(row_dict)
         time.sleep(1)
 
     # Save to CSV
     final_df = pd.DataFrame(updated_rows)
-    target_columns = [
-        "ProfileURL", "Name/Handle", "Platform", "FollowerCount", "Email", "Tags",
-        "OutreachStatus", "LastScrapedAt", "Region", "Language", "PrimaryAITool",
-        "SampleContentURL", "AIGCVerdict", "DiscoveredAt", "Source", "Notes",
-        "FeedURL", "ContactSourceURL", "EvidenceJSON"
-    ]
-    for col in target_columns:
-        if col not in final_df.columns:
-            final_df[col] = None
-
-    final_df = final_df[target_columns]
+    final_df = enforce_target_columns(final_df)
     final_df.to_csv(OUTPUT_CSV_FILE, index=False)
     print(f"\n[✓] Completed! Saved {len(final_df)} Vimeo records to '{OUTPUT_CSV_FILE}'.")
 
+
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--limit", type=int, default=None, help="Max Vimeo profiles to process")
+    parser.add_argument("--model-provider", type=str, default=None, help="Override MODEL_PROVIDER for this run")
+    parser.add_argument("--model-name", type=str, default=None, help="Override MODEL_NAME for this run")
+    args = parser.parse_args()
+    main(limit=args.limit, model_provider=args.model_provider, model_name=args.model_name)

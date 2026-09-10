@@ -34,7 +34,8 @@ creator-research-skill/
 ├── assets/
 │   └── AGENTS-template.md                ← template for a new project's facts
 └── references/
-    └── data-integrity-checklist.md       ← pre-completion verification checklist
+    ├── data-integrity-checklist.md       ← pre-completion verification checklist
+    └── scraping-patterns.md              ← worked example of scraper engineering conventions
 ```
 
 - **`SKILL.md`** — the generic procedure: discovery vs. scraping

@@ -1,61 +1,47 @@
 ---
-name: shedoesai
+name: @shedoesai
 handle: @shedoesai
 platform: TikTok
 profile_url: https://www.tiktok.com/@shedoesai
-https://www.tiktok.com/@shedoesai
 followers: 219.6K
-219.7K
-email: hello@shedoesai.com
 category: AIGC,TikTok,AI newsletter,AI tools
 language: English
-region: 
+region: nan
 ai_tools: GenAI
-GenAI
-status: Scraped
-Scraped
+status: active
 discovered_at: 2026-09-01
-last_scraped_at: 2026-09-08T05:25:29Z
-2026-09-03T02:24:23Z
-last_verified: 2026-09-08T05:25:29Z
-2026-09-03
+last_verified: 2026-09-09T03:16:23Z
+last_scraped_at: 2026-09-09T03:16:23Z
 ---
 
-# shedoesai (@shedoesai)
+# @shedoesai
 
 ## Profile
-
 - **Handle:** @shedoesai
 - **Platform:** TikTok
 - **Profile URL:** https://www.tiktok.com/@shedoesai
-- **Follower Count:** 219.7K
-- **Region:** 
-- **Language:** English
+- **Follower Count:** 219.6K
 
 ## AI / Content
-
-- **AIGC Verdict:** yes
 - **Primary AI Tool:** GenAI
+- **AIGC Verdict:** yes
+- **Language:** English
 - **Tags:** AIGC,TikTok,AI newsletter,AI tools
 
 ## Contact
-
-- **Email:** hello@shedoesai.com
+- **Email:** nan
 - **Contact Source:** https://www.tiktok.com/@shedoesai
 
 ## Evidence
-
 - **Source:** web_search: Feedspot Top 40 AI TikTok Influencers 2026
-- **Scraped At:** 2026-09-03T02:24:23Z
-- **Bio Preview:** 🤖 | Make AI work as you, not just for you
-📧 | hello@shedoesai.com
-- **External Link:** https://www.tiktok.com/@shedoesai
+- **Sample Content:** www.shedoesai.com
+- **Evidence:** TikTok scrape: followers=219.6K; bio_link=www.shedoesai.com
 
-## Notes
-
-TikTok scrape: followers=219.7K; bio_link=www.shedoesai.com
+## Research Notes
+- **Last Scraped:** 2026-09-09T03:16:23Z
+- **Notes:** TikTok scrape: followers=219.6K; bio_link=www.shedoesai.com
 
 ## Related
 
 - [[Platforms/TikTok]]
-- [[Daily/2026-09-03]]
+- [[Daily/2026-09-09]]

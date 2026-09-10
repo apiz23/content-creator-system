@@ -1,53 +1,46 @@
 ---
-name: troplanduniverse
+name: Tropland Universe (Josh Gottsegen)
 handle: @troplanduniverse
 platform: Instagram
 profile_url: https://www.instagram.com/troplanduniverse
-followers: 1M
-email: Not publicly available
-category: AIGC,Instagram,AI art,visual storytelling
-language: English
-region: United States
-ai_tools: GenAI
-status: Scraped
-discovered_at: 2026-09-02T05:21:02Z
-last_scraped_at: 2026-09-02T07:14:43Z
-last_verified: 2026-09-03
+followers: 1446577
+category: AI artist, wildlife, cinematic
+language: en
+region: Los Angeles, CA
+ai_tools: Sora
+status: active
+discovered_at: 2026-09-09
+last_verified: 2026-09-09
 ---
 
-# troplanduniverse (@troplanduniverse)
+# Tropland Universe (Josh Gottsegen)
 
 ## Profile
-
 - **Handle:** @troplanduniverse
 - **Platform:** Instagram
 - **Profile URL:** https://www.instagram.com/troplanduniverse
-- **Follower Count:** 1M
-- **Region:** United States
-- **Language:** English
+- **Follower Count:** 1446577
 
 ## AI / Content
-
-- **AIGC Verdict:** hybrid
-- **Primary AI Tool:** GenAI
-- **Tags:** AIGC,Instagram,AI art,visual storytelling
+- **Primary AI Tool:** Sora
+- **AIGC Verdict:** yes
+- **Language:** en
+- **Tags:** AIGC, Instagram, AI artist, wildlife, cinematic
 
 ## Contact
-
-- **Email:** Not publicly available
+- **Email:** partnerships@troplanduniverse.com
 - **Contact Source:** https://www.instagram.com/troplanduniverse
 
 ## Evidence
-
 - **Source:** FeedSpot Top 40 AI Artists Instagram Influencers 2026
-- **Scraped At:** 2026-09-02T07:14:43Z
-- **Bio Preview:** 1M Followers, 231 Following, 1,416 Posts - See Instagram photos and videos from Tropland Universe by Josh Gottsegen (@tr
+- **Sample Content:** https://www.instagram.com/troplanduniverse
+- **Evidence:** Josh Gottsegen; AI artist and creative director; 1.4M followers; collaborations with Meta, Adobe, OpenAI, Sora, Kling, Topaz Labs; 25+ years in design/marketing/production
 
-## Notes
-
-Playwright scrape: followers=1M
+## Research Notes
+- **Last Scraped:** Not yet scraped
+- **Notes:** Josh Gottsegen; AI artist and creative director; 1.4M followers; collaborations with Meta, Adobe, OpenAI, Sora, Kling, Topaz Labs; 25+ years in design/marketing/production
 
 ## Related
 
 - [[Platforms/Instagram]]
-- [[Daily/2026-09-03]]
+- [[Daily/2026-09-09]]

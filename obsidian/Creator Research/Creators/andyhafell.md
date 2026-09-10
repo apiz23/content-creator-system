@@ -1,60 +1,47 @@
 ---
-name: andyhafell
+name: @andyhafell
 handle: @andyhafell
 platform: TikTok
 profile_url: https://www.tiktok.com/@andyhafell
-https://www.tiktok.com/@andyhafell
 followers: 224.4K
-224.5K
-email: Not publicly available
 category: AIGC,TikTok,AI agents,automation
 language: English
-region: 
+region: nan
 ai_tools: GenAI
-GenAI
-status: Scraped
-Scraped
+status: active
 discovered_at: 2026-09-01
-last_scraped_at: 2026-09-08T05:25:12Z
-2026-09-03T02:24:05Z
-last_verified: 2026-09-08T05:25:12Z
-2026-09-03
+last_verified: 2026-09-09T03:16:06Z
+last_scraped_at: 2026-09-09T03:16:06Z
 ---
 
-# andyhafell (@andyhafell)
+# @andyhafell
 
 ## Profile
-
 - **Handle:** @andyhafell
 - **Platform:** TikTok
 - **Profile URL:** https://www.tiktok.com/@andyhafell
-- **Follower Count:** 224.5K
-- **Region:** 
-- **Language:** English
+- **Follower Count:** 224.4K
 
 ## AI / Content
-
-- **AIGC Verdict:** yes
 - **Primary AI Tool:** GenAI
+- **AIGC Verdict:** yes
+- **Language:** English
 - **Tags:** AIGC,TikTok,AI agents,automation
 
 ## Contact
-
-- **Email:** Not publicly available
-- **Contact Source:** https://www.tiktok.com/@andyhafell
+- **Email:** nan
+- **Contact Source:** nan
 
 ## Evidence
-
 - **Source:** web_search: Feedspot Top 40 AI TikTok Influencers 2026
-- **Scraped At:** 2026-09-03T02:24:05Z
-- **Bio Preview:** Build AI Agents & Automations that does work for you 👇
-- **External Link:** https://www.tiktok.com/@andyhafell
+- **Sample Content:** https://www.tiktok.com/@andyhafell
+- **Evidence:** TikTok scrape: followers=224.4K; bio_link=none
 
-## Notes
-
-TikTok scrape: followers=224.5K; bio_link=none
+## Research Notes
+- **Last Scraped:** 2026-09-09T03:16:06Z
+- **Notes:** TikTok scrape: followers=224.4K; bio_link=none
 
 ## Related
 
 - [[Platforms/TikTok]]
-- [[Daily/2026-09-03]]
+- [[Daily/2026-09-09]]

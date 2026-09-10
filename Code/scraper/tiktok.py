@@ -7,17 +7,23 @@ import pandas as pd
 from datetime import datetime
 from playwright.sync_api import sync_playwright
 from pathlib import Path
+import argparse
 
 from model_client import call_model
-
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+from common import (
+    PROJECT_ROOT, INPUT_CSV_FILE, TARGET_COLUMNS,
+    load_and_clean_csv, get_column_names, enforce_target_columns,
+    merge_scraped_row, extract_email, filter_platform_rows
+)
 
 # --- CONFIGURATION ---
-INPUT_CSV_FILE = PROJECT_ROOT / "data/input/input_channels.csv"
 OUTPUT_CSV_FILE = PROJECT_ROOT / "data/output/tiktok_scraped_output.csv"
 
-# 1. AI Classifier
-def classify_with_local_llm(bio: str, handle: str):
+
+def classify_with_local_llm(bio: str, handle: str, model_provider=None, model_name=None):
+    """
+    Analyze TikTok creator's handle and bio using local LLM.
+    """
     prompt = f"""
     Analyze this TikTok creator's handle and bio.
     Handle: {handle}
@@ -33,7 +39,7 @@ def classify_with_local_llm(bio: str, handle: str):
     }}
     """
     try:
-        response_text = call_model(prompt, format="json", timeout=15)
+        response_text = call_model(prompt, format="json", timeout=15, model_provider=model_provider, model_name=model_name)
         return json.loads(response_text)
     except Exception:
         # Fallback if Ollama is offline
@@ -47,14 +53,9 @@ def classify_with_local_llm(bio: str, handle: str):
             "Evidence": "Rule-based keyword fallback"
         }
 
-def extract_email(text: str):
-    if not text:
-        return "not exposed"
-    match = re.search(r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+', str(text))
-    return match.group(0) if match else "not exposed"
 
 # 2. Standalone TikTok Scraper via Playwright
-def scrape_tiktok_profile(page, profile_url: str):
+def scrape_tiktok_profile(page, profile_url: str, model_provider=None, model_name=None):
     try:
         # Navigate to profile with custom user-agent
         page.goto(profile_url, wait_until="domcontentloaded", timeout=25000)
@@ -92,7 +93,7 @@ def scrape_tiktok_profile(page, profile_url: str):
             pass
 
         # AI Classification
-        ai_meta = classify_with_local_llm(bio, handle)
+        ai_meta = classify_with_local_llm(bio, handle, model_provider=model_provider, model_name=model_name)
         email = extract_email(bio)
 
         evidence = {
@@ -125,26 +126,19 @@ def scrape_tiktok_profile(page, profile_url: str):
         return None
 
 # --- 3. BATCH PROCESSOR ---
-def main():
-    if not os.path.exists(INPUT_CSV_FILE):
+def main(limit=None, model_provider=None, model_name=None):
+    if not INPUT_CSV_FILE.exists():
         print(f"[!] File '{INPUT_CSV_FILE}' not found. Please create it or verify the path.")
         return
 
     print(f"[+] Loading input file: {INPUT_CSV_FILE}")
-    df = pd.read_csv(INPUT_CSV_FILE)
-    df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
-    df.columns = [c.strip() for c in df.columns]
+    df = load_and_clean_csv(INPUT_CSV_FILE)
+    platform_col, url_col = get_column_names(df)
 
-    platform_col = "Platform" if "Platform" in df.columns else df.columns[2]
-    url_col = "ProfileURL" if "ProfileURL" in df.columns else df.columns[0]
-
-    # Filter strictly for TikTok rows (Column C == TikTok or URL contains tiktok.com)
-    tiktok_mask = (
-        df[platform_col].astype(str).str.strip().str.lower().isin(["tiktok", "tt"]) |
-        df[url_col].astype(str).str.contains("tiktok.com", case=False, na=False)
-    )
-
-    tiktok_rows = df[tiktok_mask].copy()
+    # Filter strictly for TikTok rows
+    tiktok_rows = filter_platform_rows(df, platform_col, url_col, "tiktok", "tiktok.com")
+    if limit is not None:
+        tiktok_rows = tiktok_rows.head(limit)
     print(f"[+] Found {len(tiktok_rows)} TikTok profiles to scrape.\n")
 
     if tiktok_rows.empty:
@@ -153,7 +147,6 @@ def main():
 
     updated_rows = []
 
-    # Launch Headless Chromium
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         context = browser.new_context(
@@ -167,44 +160,23 @@ def main():
             print(f"[{idx}/{len(tiktok_rows)}] Scraping TikTok: {url}")
 
             scraped_data = scrape_tiktok_profile(page, url)
-
             row_dict = row.to_dict()
             row_dict["Platform"] = "TikTok"
-
-            if scraped_data:
-                row_dict["Name/Handle"] = scraped_data["Handle"]
-                row_dict["FollowerCount"] = scraped_data["FollowerCount"]
-                if row_dict.get("Email") in [None, "", "not exposed"]:
-                    row_dict["Email"] = scraped_data["Email"]
-                row_dict["LastScrapedAt"] = scraped_data["LastScrapedAt"]
-                row_dict["Language"] = scraped_data["Language"]
-                row_dict["PrimaryAITool"] = scraped_data["PrimaryAITool"] or row_dict.get("PrimaryAITool")
-                row_dict["SampleContentURL"] = scraped_data["SampleContentURL"] or row_dict.get("SampleContentURL")
-                row_dict["AIGCVerdict"] = scraped_data["AIGCVerdict"]
-                row_dict["Notes"] = scraped_data["Notes"]
-                row_dict["FeedURL"] = scraped_data["FeedURL"]
-                row_dict["ContactSourceURL"] = scraped_data["ContactSourceURL"]
-                row_dict["EvidenceJSON"] = scraped_data["EvidenceJSON"]
-
+            row_dict = merge_scraped_row(row_dict, scraped_data)
             updated_rows.append(row_dict)
 
         browser.close()
 
     # Save to CSV
     final_df = pd.DataFrame(updated_rows)
-    target_columns = [
-        "ProfileURL", "Name/Handle", "Platform", "FollowerCount", "Email", "Tags",
-        "OutreachStatus", "LastScrapedAt", "Region", "Language", "PrimaryAITool",
-        "SampleContentURL", "AIGCVerdict", "DiscoveredAt", "Source", "Notes",
-        "FeedURL", "ContactSourceURL", "EvidenceJSON"
-    ]
-    for col in target_columns:
-        if col not in final_df.columns:
-            final_df[col] = None
-
-    final_df = final_df[target_columns]
+    final_df = enforce_target_columns(final_df)
     final_df.to_csv(OUTPUT_CSV_FILE, index=False)
     print(f"\n[✓] Completed! Saved {len(final_df)} TikTok records to '{OUTPUT_CSV_FILE}'.")
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--limit", type=int, default=None, help="Max TikTok profiles to process")
+    parser.add_argument("--model-provider", type=str, default=None, help="Override MODEL_PROVIDER for this run")
+    parser.add_argument("--model-name", type=str, default=None, help="Override MODEL_NAME for this run")
+    args = parser.parse_args()
+    main(limit=args.limit, model_provider=args.model_provider, model_name=args.model_name)

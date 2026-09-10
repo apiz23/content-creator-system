@@ -1,55 +1,47 @@
 ---
-name: gianluca.mauro
+name: @gianluca.mauro
 handle: @gianluca.mauro
 platform: TikTok
 profile_url: https://www.tiktok.com/@gianluca.mauro
-followers: 171K
-email: Not publicly available
+followers: 171.4K
 category: AIGC,TikTok,AI entrepreneur,AI Academy,small-creator
 language: English
 region: Italy
 ai_tools: GenAI
-status: Scraped
+status: active
 discovered_at: 2026-09-01T07:27:58Z
-last_scraped_at: 2026-09-03T02:26:09Z
-last_verified: 2026-09-03
+last_verified: 2026-09-09T03:18:09Z
+last_scraped_at: 2026-09-09T03:18:09Z
 ---
 
-# gianluca.mauro (@gianluca.mauro)
+# @gianluca.mauro
 
 ## Profile
-
 - **Handle:** @gianluca.mauro
 - **Platform:** TikTok
 - **Profile URL:** https://www.tiktok.com/@gianluca.mauro
-- **Follower Count:** 171K
-- **Region:** Italy
-- **Language:** English
+- **Follower Count:** 171.4K
 
 ## AI / Content
-
-- **AIGC Verdict:** yes
 - **Primary AI Tool:** GenAI
+- **AIGC Verdict:** yes
+- **Language:** English
 - **Tags:** AIGC,TikTok,AI entrepreneur,AI Academy,small-creator
 
 ## Contact
-
-- **Email:** Not publicly available
-- **Contact Source:** https://www.tiktok.com/@gianluca.mauro
+- **Email:** not exposed
+- **Contact Source:** gianlucamauro.substack.com/subscribe
 
 ## Evidence
-
 - **Source:** FeedSpot Top 40 AI TikTok Influencers 2026; TikTok profile verified; gianlucamauro.com
-- **Scraped At:** 2026-09-03T02:26:09Z
-- **Bio Preview:** AI entrepreneur known for bold ideas backed by 10+ years of no-B.S. execution.
-More thoughts on my S
-- **External Link:** https://www.tiktok.com/@gianluca.mauro
+- **Sample Content:** gianlucamauro.substack.com/subscribe
+- **Evidence:** TikTok scrape: followers=171.4K; bio_link=gianlucamauro.substack.com/subscribe
 
-## Notes
-
-TikTok scrape: followers=171K; bio_link=gianlucamauro.substack.com/subscribe
+## Research Notes
+- **Last Scraped:** 2026-09-09T03:18:09Z
+- **Notes:** TikTok scrape: followers=171.4K; bio_link=gianlucamauro.substack.com/subscribe
 
 ## Related
 
 - [[Platforms/TikTok]]
-- [[Daily/2026-09-03]]
+- [[Daily/2026-09-09]]

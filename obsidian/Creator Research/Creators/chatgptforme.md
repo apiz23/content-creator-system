@@ -1,51 +1,47 @@
 ---
-name: Dylan Watkins
-handle: chatgptforme
+name: @chatgptforme
+handle: @chatgptforme
 platform: TikTok
 profile_url: https://www.tiktok.com/@chatgptforme
-https://www.tiktok.com/@chatgptforme
-followers: N/A
-53.8K
-email: not exposed
-category: AIGC, AI Automation, Entrepreneurs
-language: en
+followers: nan
+category: AIGC,TikTok,AI automation,entrepreneurs
+language: English
 region: US
 ai_tools: Chatgpt
-ChatGPT
-status: Scraped
-discovered
-last_verified: 2026-09-08T05:30:30Z
-2026-09-04
+status: active
+discovered_at: 2026-09-04T00:52:16Z
+last_verified: 2026-09-09T03:21:24Z
+last_scraped_at: 2026-09-09T03:21:24Z
 ---
 
-# Dylan Watkins
+# @chatgptforme
 
 ## Profile
-
+- **Handle:** @chatgptforme
 - **Platform:** TikTok
 - **Profile URL:** https://www.tiktok.com/@chatgptforme
-- **Followers:** — (scraped 2026-09-04: no FC data, TikTok blocked)
-- **Region:** US
-- **Language:** en
+- **Follower Count:** nan
 
-## Content
+## AI / Content
+- **Primary AI Tool:** Chatgpt
+- **AIGC Verdict:** hybrid
+- **Language:** English
+- **Tags:** AIGC,TikTok,AI automation,entrepreneurs
 
-- **Niche:** AI automation for entrepreneurs, revenue generation
-- **Bio:** I help entrepreneurs save time and make money with AI, automation & rev gen apps.
-- **Type:** Micro influencer
-
-## AI / Technology
-
-- **Primary AI Tool:** ChatGPT
-- **AIGC Verdict:** unsure (discovery-only, FeedSpot source)
+## Contact
+- **Email:** not exposed
+- **Contact Source:** nan
 
 ## Evidence
-
-- **Source:** FeedSpot Top 40 AI TikTok Influencers (Aug 19, 2026)
-  - URL: https://creators.feedspot.com/ai_tiktok_influencers/
+- **Source:** FeedSpot Top 40 AI TikTok Influencers Aug 2026
 - **Sample Content:** https://www.tiktok.com/@chatgptforme
+- **Evidence:** TikTok scrape: followers=N/A; bio_link=none
+
+## Research Notes
+- **Last Scraped:** 2026-09-09T03:21:24Z
+- **Notes:** TikTok scrape: followers=N/A; bio_link=none
 
 ## Related
 
-- [[TikTok]]
-- [[2026-09-04]]
+- [[Platforms/TikTok]]
+- [[Daily/2026-09-09]]

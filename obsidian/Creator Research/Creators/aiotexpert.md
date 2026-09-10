@@ -1,51 +1,47 @@
 ---
-name: John Soldatos
-handle: aiotexpert
+name: @aiotexpert
+handle: @aiotexpert
 platform: TikTok
 profile_url: https://www.tiktok.com/@aiotexpert
-https://www.tiktok.com/@aiotexpert
 followers: 33.1K
-32.2K
-email: not exposed
-category: AIGC, IoT, AI Expert, Academic
-language: en
+category: AIGC,TikTok,IoT,AI expert,academic
+language: English
 region: EU
 ai_tools: GenAI
-AIoT
-status: Scraped
-discovered
-last_verified: 2026-09-08T05:30:48Z
-2026-09-04
+status: active
+discovered_at: 2026-09-04T00:52:16Z
+last_verified: 2026-09-09T03:21:42Z
+last_scraped_at: 2026-09-09T03:21:42Z
 ---
 
-# John Soldatos
+# @aiotexpert
 
 ## Profile
-
+- **Handle:** @aiotexpert
 - **Platform:** TikTok
 - **Profile URL:** https://www.tiktok.com/@aiotexpert
-- **Followers:** 33.1K (scraped 2026-09-04, Playwright)
-- **Region:** EU
-- **Language:** en
+- **Follower Count:** 33.1K
 
-## Content
+## AI / Content
+- **Primary AI Tool:** GenAI
+- **AIGC Verdict:** yes
+- **Language:** English
+- **Tags:** AIGC,TikTok,IoT,AI expert,academic
 
-- **Niche:** AI IoT education, academic AI expertise
-- **Bio:** ECE PhD. 30Y Experience, 100+ projects, 200+ pubs - I don't DM - beware of scams!
-- **Type:** Micro influencer
-
-## AI / Technology
-
-- **Primary AI Tool:** AIoT (AI + IoT)
-- **AIGC Verdict:** unsure (discovery-only, FeedSpot source)
+## Contact
+- **Email:** not exposed
+- **Contact Source:** lnk.bio/aiotexpert
 
 ## Evidence
+- **Source:** FeedSpot Top 40 AI TikTok Influencers Aug 2026
+- **Sample Content:** lnk.bio/aiotexpert
+- **Evidence:** TikTok scrape: followers=33.1K; bio_link=lnk.bio/aiotexpert
 
-- **Source:** FeedSpot Top 40 AI TikTok Influencers (Aug 19, 2026)
-  - URL: https://creators.feedspot.com/ai_tiktok_influencers/
-- **Sample Content:** https://www.tiktok.com/@aiotexpert
+## Research Notes
+- **Last Scraped:** 2026-09-09T03:21:42Z
+- **Notes:** TikTok scrape: followers=33.1K; bio_link=lnk.bio/aiotexpert
 
 ## Related
 
-- [[TikTok]]
-- [[2026-09-04]]
+- [[Platforms/TikTok]]
+- [[Daily/2026-09-09]]

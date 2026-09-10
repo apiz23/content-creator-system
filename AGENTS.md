@@ -352,15 +352,79 @@ The input CSV is the source of truth for scraping.
 
 ## 4.3 Platform Routing
 
-- Threads → `Code/scraper/threads.py`
-- TikTok → `Code/scraper/tiktok.py`
-- Instagram → `Code/scraper/instagram.py`
-- Facebook → `Code/scraper/facebook.py`
-- LinkedIn → `Code/scraper/linkedin.py`
-- Reddit → `Code/scraper/reddit.py`
-- YouTube → `Code/scraper/main.py`
-- Vimeo → `Code/scraper/vimeo.py`
-- Civitai → `Code/scraper/civitai.py`
+Each scraper is a standalone Python script run with `python3 <file>` from the repo root (or the `.venv` activated). All 10 scripts read from `data/input/input_channels.csv`, filter by platform, and write to their platform-specific output CSV. There are no CLI arguments, flags, or subcommands — every scraper processes the entire filtered input file at once.
+
+**`Code/scraper/run.py`** is the unified dispatcher. It supports three modes: `--platform`, `--url`, and `--input` (full-CSV batch). After dispatching each profile, `run.py` automatically merges results into `data/Creator-Intel-CRM-List.csv` using the safe-write procedure (read → check duplicate by ProfileURL → update or append → validate → write → re-read to verify). `run.py` also writes intermediate results to `data/output/run_dispatch_output.csv` (URL mode) or `data/output/batch_dispatch_output.csv` (batch mode).
+
+|| Platform | Script | Input | Output | Preconditions | Delay |
+|---|---|---|---|---|---|
+| **Civitai** | `Code/scraper/civitai.py` | `data/input/input_channels.csv` | `data/output/civitai_scraped_output.csv` | No browser needed. Public API. Requires `requests`, `pandas`. | 1s |
+| **Facebook** | `Code/scraper/facebook.py` | `data/input/input_channels.csv` | `data/output/facebook_scraped_output.csv` | Playwright + Chromium installed. Requires `playwright`, `requests`, `pandas`. | 2s |
+| **Instagram** | `Code/scraper/instagram.py` | `data/input/input_channels.csv` | `data/output/instagram_scraped_output.csv` | Playwright + Chromium installed. Requires `playwright`, `requests`, `pandas`. | 3s |
+| **LinkedIn** | `Code/scraper/linkedin.py` | `data/input/input_channels.csv` | `data/output/linkedin_scraped_output.csv` | Playwright + Chromium installed. Requires `playwright`, `requests`, `pandas`. | 2.5s |
+| **Reddit** | `Code/scraper/reddit.py` | `data/input/input_channels.csv` | `data/output/reddit_scraped_output.csv` | Playwright + Chromium installed. Requires `playwright`, `requests`, `pandas`. | 1.5s |
+| **Threads** | `Code/scraper/threads.py` | `data/input/input_channels.csv` | `data/output/threads_scraped_output.csv` | Playwright + Chromium installed. Requires `playwright`, `requests`, `pandas`. | 1.5s |
+| **TikTok** | `Code/scraper/tiktok.py` | `data/input/input_channels.csv` | `data/output/tiktok_scraped_output.csv` | Playwright + Chromium installed. Requires `playwright`, `requests`, `pandas`. | 2s |
+| **YouTube** | `Code/scraper/main.py` | `data/input/input_channels.csv` | `data/output/youtube_refreshed_output.csv` | `yt-dlp` installed (`.venv/bin/yt-dlp`). No browser needed. Requires `yt-dlp`, `requests`, `pandas`. | None (yt-dlp self-manages) |
+| **Vimeo** | `Code/scraper/vimeo.py` | `data/input/input_channels.csv` | `data/output/vimeo_scraped_output.csv` | `yt-dlp` installed (`.venv/bin/yt-dlp`). No browser needed. Requires `yt-dlp`, `requests`, `pandas`. | 1s |
+| **All-in-one** | `Code/scraper/scrape_all.py` | `data/input/input_channels.csv` | `data/output/all_scraped_output.csv` | Playwright + Chromium + `yt-dlp` installed. Supports all platforms in one pass. | Varies by platform order |
+|---|---|---|---|---|---|
+| **Flag** | **All platforms** | — | — | `python3 Code/scraper/<platform>.py --limit N` processes only the first `N` matching rows for that platform after platform filtering, in memory; omitting it processes all matching rows and preserves current behavior. `input_channels.csv` is never modified by a scraper run. |
+
+### Invocation command
+
+```bash
+python3 Code/scraper/<platform>.py
+```
+
+Example:
+```bash
+python3 Code/scraper/tiktok.py
+```
+
+There are no CLI arguments. Every scraper reads the entire `data/input/input_channels.csv`, filters rows matching its platform, processes all matching rows, and writes the output CSV. To limit which creators get scraped, filter the input CSV before running the scraper.
+
+### Environment variables
+
+All scrapers that use the AI classifier read from `Code/scraper/model_client.py`, which loads `.env` from the project root. Required variables:
+- `MODEL_PROVIDER` (default `ollama`)
+- `MODEL_NAME` (default `qwen3.5:latest`)
+- `OLLAMA_BASE_URL` (default `http://localhost:11434`)
+- For `MODEL_PROVIDER=api`: `API_BASE_URL`, `API_KEY`
+
+### Preconditions checklist
+
+Before running any scraper:
+1. **Python venv active**: `.venv/bin/python` or `source .venv/bin/activate`. The project uses `.venv`.
+2. **Dependencies installed**: `pip install -r requirements.txt` — this includes `python-dotenv`, `playwright`, `pandas`, `requests`, `yt-dlp`.
+3. **Playwright browsers installed** (for browser scrapers): `playwright install chromium`. This is required for Facebook, Instagram, LinkedIn, Reddit, Threads, TikTok.
+4. **yt-dlp available** (for YouTube and Vimeo): `yt-dlp` must exist at `.venv/bin/yt-dlp` or on `PATH`.
+5. **Ollama running** (if using default provider): `ollama serve` must be running at `http://localhost:11434`. The AI classifier calls this on every profile. If Ollama is offline, the scraper falls back to rule-based classification.
+6. **Input CSV exists**: `data/input/input_channels.csv` must be present and populated. If empty, the scraper reports zero profiles found.
+7. **Working directory**: The repo root (`.venv` sibling directory). Scripts use `Path(__file__).resolve().parent.parent` to find data files, so they work from any cwd as long as the `.venv` is active and `model_client.py` is importable.
+
+### Typical runtime and failure modes
+
+- **Runtime**: Each profile takes roughly 2–5 seconds for browser-based platforms (page load + AI classification). A full input file of 900+ creators could take hours. YouTube/Vimeo with `yt-dlp` are faster per profile but slower overall for large channels.
+- **Known failure modes**:
+  - **Playwright browser launch failure**: Usually means Chromium is not installed (`playwright install chromium`).
+  - **Ollama offline**: The AI classifier catches the exception and falls back to rule-based classification. The scraper continues but with less accurate tags. Check `call_model()` errors in the output.
+  - **Rate limiting / bot walls**: Some platforms (Facebook, LinkedIn, Instagram) aggressively throttle. Signs include HTTP 403/429, empty DOM extracts, or `PageError` exceptions. These are caught per-record and logged as `[-] Error scraping ...`.
+  - **Empty output CSV**: Usually means the input CSV has no rows matching the platform filter. Check `data/input/input_channels.csv` for rows with the correct `Platform` column value.
+  - **`ModuleNotFoundError: No module named 'dotenv'`**: The wrong Python interpreter is running. Use `.venv/bin/python` or activate `.venv`.
+  - **YouTube/Vimeo `ModuleNotFoundError: No module named 'yt_dlp'`**: `yt-dlp` not installed in the venv. Run `pip install yt-dlp` or check `.venv/bin/yt-dlp`.
+  - **`response.json()` or JSON parse errors**: The model returned an unexpected format. Caught by the exception handler; fallback classification applies.
+  - **`AttributeError: 'NoneType' object has no attribute 'replace'`** (Vimeo): A pre-existing type issue where `uploader_name` is `None`. Does not crash the run but may log an error for specific profiles.
+
+### Post-scrape workflow
+
+After scraping completes:
+1. **Verify output CSV**: Check `data/output/<platform>_scraped_output.csv` exists and has the expected row count.
+2. **Sync to CRM**: Run `Code/scraper/sync_tiktok_crm.py` (or the equivalent sync script for the platform) to merge output into `data/Creator-Intel-CRM-List.csv` and sync Obsidian notes.
+3. **Update Obsidian**: Sync creator notes, platform notes, and daily log.
+4. **Report counts**: Successful records, failed records, new vs. updated in CRM.
+
+Note: `scrape_all.py` is the all-in-one runner that handles all platforms sequentially. It supports Civitai, YouTube, Vimeo, Threads, TikTok, Instagram, Facebook, LinkedIn, and Reddit in a single pass. Use it for "scrape all platforms" requests.
 
 ## 4.4 Scrape Output
 

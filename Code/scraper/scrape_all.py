@@ -7,12 +7,17 @@ import pandas as pd
 from datetime import datetime
 from urllib.parse import unquote
 from pathlib import Path
+import argparse
 
 from model_client import call_model
+from common import (
+    PROJECT_ROOT, INPUT_CSV_FILE, TARGET_COLUMNS,
+    load_and_clean_csv, get_column_names, enforce_target_columns,
+    merge_scraped_row, extract_email, filter_platform_rows,
+    URL_PATTERNS, PLATFORM_ALIASES
+)
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-
-INPUT_CSV_FILE = PROJECT_ROOT / "data/input/input_channels.csv"
+# --- CONFIGURATION ---
 OUTPUT_CSV_FILE = PROJECT_ROOT / "data/output/all_scraped_output.csv"
 
 def classify_with_local_llm(bio: str, handle: str, platform: str, extra: str = ""):
@@ -716,18 +721,14 @@ def detect_platform(row, platform_col, url_col):
 #  UNIFIED MAIN
 # ============================================================
 
-def main():
-    if not os.path.exists(INPUT_CSV_FILE):
+def main(limit=None):
+    if not INPUT_CSV_FILE.exists():
         print(f"[!] '{INPUT_CSV_FILE}' not found. Please create it.")
         return
 
     print(f"[+] Loading {INPUT_CSV_FILE}...")
-    df = pd.read_csv(INPUT_CSV_FILE)
-    df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
-    df.columns = [c.strip() for c in df.columns]
-
-    platform_col = "Platform" if "Platform" in df.columns else df.columns[2]
-    url_col = "ProfileURL" if "ProfileURL" in df.columns else df.columns[0]
+    df = load_and_clean_csv(INPUT_CSV_FILE)
+    platform_col, url_col = get_column_names(df)
 
     # Group rows by platform
     groups = {}
@@ -739,6 +740,10 @@ def main():
             print(f"[!] Skipping row {idx}: couldn't detect platform for {row.get(url_col, '')}")
 
     print(f"[+] Platforms found: {', '.join(f'{k}({len(v)})' for k, v in sorted(groups.items()))}\n")
+
+    if limit is not None:
+        for plat in groups:
+            groups[plat] = groups[plat][:limit]
 
     all_updated = []
     browser_plats = {k for k, v in PLATFORM_SCRAPERS.items() if v[0] == "browser"}
@@ -774,23 +779,7 @@ def main():
                     scraped = scraper_fn(page, url)
                     row_dict = row.to_dict()
                     row_dict["Platform"] = plat.title()
-
-                    if scraped:
-                        row_dict["Name/Handle"] = scraped.get("Handle") or row_dict.get("Name/Handle")
-                        row_dict["FollowerCount"] = scraped.get("FollowerCount") or row_dict.get("FollowerCount")
-                        if row_dict.get("Email") in [None, "", "not exposed"]:
-                            row_dict["Email"] = scraped.get("Email")
-                        row_dict["LastScrapedAt"] = scraped.get("LastScrapedAt")
-                        row_dict["Region"] = scraped.get("Region") or row_dict.get("Region")
-                        row_dict["Language"] = scraped.get("Language") or row_dict.get("Language")
-                        row_dict["PrimaryAITool"] = scraped.get("PrimaryAITool") or row_dict.get("PrimaryAITool")
-                        row_dict["SampleContentURL"] = scraped.get("SampleContentURL") or row_dict.get("SampleContentURL")
-                        row_dict["AIGCVerdict"] = scraped.get("AIGCVerdict")
-                        row_dict["Notes"] = scraped.get("Notes")
-                        row_dict["FeedURL"] = scraped.get("FeedURL")
-                        row_dict["ContactSourceURL"] = scraped.get("ContactSourceURL")
-                        row_dict["EvidenceJSON"] = scraped.get("EvidenceJSON")
-
+                    row_dict = merge_scraped_row(row_dict, scraped)
                     all_updated.append(row_dict)
                     time.sleep(2)
 
@@ -835,4 +824,7 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--limit", type=int, default=None, help="Max profiles per platform to process")
+    args = parser.parse_args()
+    main(limit=args.limit)

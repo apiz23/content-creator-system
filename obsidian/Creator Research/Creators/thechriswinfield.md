@@ -1,61 +1,47 @@
 ---
-name: thechriswinfield
+name: @thechriswinfield
 handle: @thechriswinfield
 platform: TikTok
 profile_url: https://www.tiktok.com/@thechriswinfield
-https://www.tiktok.com/@thechriswinfield
-followers: 120.7K
-120.7K
-email: Not publicly available
+followers: 120.6K
 category: AIGC,TikTok,AI,news
 language: English
 region: United States
 ai_tools: GenAI
-GenAI
-status: Scraped
-Scraped
+status: active
 discovered_at: 2026-09-02T05:21:02Z
-last_scraped_at: 2026-09-08T05:28:08Z
-2026-09-03T02:27:02Z
-last_verified: 2026-09-08T05:28:08Z
-2026-09-03
+last_verified: 2026-09-09T03:19:01Z
+last_scraped_at: 2026-09-09T03:19:01Z
 ---
 
-# thechriswinfield (@thechriswinfield)
+# @thechriswinfield
 
 ## Profile
-
 - **Handle:** @thechriswinfield
 - **Platform:** TikTok
 - **Profile URL:** https://www.tiktok.com/@thechriswinfield
-- **Follower Count:** 120.7K
-- **Region:** United States
-- **Language:** English
+- **Follower Count:** 120.6K
 
 ## AI / Content
-
-- **AIGC Verdict:** yes
 - **Primary AI Tool:** GenAI
+- **AIGC Verdict:** yes
+- **Language:** English
 - **Tags:** AIGC,TikTok,AI,news
 
 ## Contact
-
-- **Email:** Not publicly available
-- **Contact Source:** https://www.tiktok.com/@thechriswinfield
+- **Email:** not exposed
+- **Contact Source:** nan
 
 ## Evidence
-
 - **Source:** FeedSpot Top 40 AI TikTok Influencers 2026
-- **Scraped At:** 2026-09-03T02:27:02Z
-- **Bio Preview:** 🤖 Everything you need to know about AI…
-in 90 seconds or less each day! 💯
-- **External Link:** https://www.tiktok.com/@thechriswinfield
+- **Sample Content:** https://www.tiktok.com/@thechriswinfield
+- **Evidence:** TikTok scrape: followers=120.6K; bio_link=none
 
-## Notes
-
-TikTok scrape: followers=120.7K; bio_link=none
+## Research Notes
+- **Last Scraped:** 2026-09-09T03:19:01Z
+- **Notes:** TikTok scrape: followers=120.6K; bio_link=none
 
 ## Related
 
 - [[Platforms/TikTok]]
-- [[Daily/2026-09-03]]
+- [[Daily/2026-09-09]]

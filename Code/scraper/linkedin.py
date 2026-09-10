@@ -7,17 +7,23 @@ import pandas as pd
 from datetime import datetime
 from playwright.sync_api import sync_playwright
 from pathlib import Path
+import argparse
 
 from model_client import call_model
-
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+from common import (
+    PROJECT_ROOT, INPUT_CSV_FILE, TARGET_COLUMNS,
+    load_and_clean_csv, get_column_names, enforce_target_columns,
+    merge_scraped_row, extract_email, filter_platform_rows
+)
 
 # --- CONFIGURATION ---
-INPUT_CSV_FILE = PROJECT_ROOT / "data/input/input_channels.csv"
 OUTPUT_CSV_FILE = PROJECT_ROOT / "data/output/linkedin_scraped_output.csv"
 
-# 1. AI Classifier
-def classify_with_local_llm(headline_and_bio: str, name: str):
+
+def classify_with_local_llm(headline_and_bio: str, name: str, model_provider=None, model_name=None):
+    """
+    Analyze LinkedIn professional profile using local LLM.
+    """
     prompt = f"""
     Analyze this LinkedIn professional profile:
     Name: {name}
@@ -34,7 +40,7 @@ def classify_with_local_llm(headline_and_bio: str, name: str):
     }}
     """
     try:
-        response_text = call_model(prompt, format="json", timeout=15)
+        response_text = call_model(prompt, format="json", timeout=15, model_provider=model_provider, model_name=model_name)
         return json.loads(response_text)
     except Exception:
         combined = f"{name} {headline_and_bio}".lower()
@@ -48,11 +54,6 @@ def classify_with_local_llm(headline_and_bio: str, name: str):
             "Evidence": "Rule-based keyword fallback"
         }
 
-def extract_email(text: str):
-    if not text:
-        return "not exposed"
-    match = re.search(r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+', str(text))
-    return match.group(0) if match else "not exposed"
 
 def extract_linkedin_handle(raw_url: str):
     if not isinstance(raw_url, str) or not raw_url.strip():
@@ -63,8 +64,9 @@ def extract_linkedin_handle(raw_url: str):
         return f"@{match.group(1).replace('/', '')}"
     return url.split('/')[-1] or url
 
+
 # 2. LinkedIn Profile & Page Scraper via Playwright
-def scrape_linkedin_profile(page, profile_url: str):
+def scrape_linkedin_profile(page, profile_url: str, model_provider=None, model_name=None):
     try:
         page.goto(profile_url, wait_until="domcontentloaded", timeout=25000)
         time.sleep(2.5)
@@ -103,7 +105,7 @@ def scrape_linkedin_profile(page, profile_url: str):
             pass
 
         # AI Classification & Email Extraction
-        ai_meta = classify_with_local_llm(bio, name)
+        ai_meta = classify_with_local_llm(bio, name, model_provider=model_provider, model_name=model_name)
         email = extract_email(bio)
 
         evidence = {
@@ -136,27 +138,21 @@ def scrape_linkedin_profile(page, profile_url: str):
         print(f"[-] Error scraping LinkedIn {profile_url}: {e}")
         return None
 
+
 # --- 3. BATCH PROCESSOR ---
-def main():
-    if not os.path.exists(INPUT_CSV_FILE):
+def main(limit=None, model_provider=None, model_name=None):
+    if not INPUT_CSV_FILE.exists():
         print(f"[!] File '{INPUT_CSV_FILE}' not found. Please create it or verify the path.")
         return
 
     print(f"[+] Loading input file: {INPUT_CSV_FILE}")
-    df = pd.read_csv(INPUT_CSV_FILE)
-    df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
-    df.columns = [c.strip() for c in df.columns]
-
-    platform_col = "Platform" if "Platform" in df.columns else df.columns[2]
-    url_col = "ProfileURL" if "ProfileURL" in df.columns else df.columns[0]
+    df = load_and_clean_csv(INPUT_CSV_FILE)
+    platform_col, url_col = get_column_names(df)
 
     # Filter strictly for LinkedIn rows
-    li_mask = (
-        df[platform_col].astype(str).str.strip().str.lower().isin(["linkedin", "li"]) |
-        df[url_col].astype(str).str.contains("linkedin.com", case=False, na=False)
-    )
-
-    li_rows = df[li_mask].copy()
+    li_rows = filter_platform_rows(df, platform_col, url_col, "linkedin", "linkedin.com")
+    if limit is not None:
+        li_rows = li_rows.head(limit)
     print(f"[+] Found {len(li_rows)} LinkedIn profiles to scrape.\n")
 
     if li_rows.empty:
@@ -177,27 +173,10 @@ def main():
             url = str(row[url_col]).strip()
             print(f"[{idx}/{len(li_rows)}] Scraping LinkedIn: {url}")
 
-            scraped_data = scrape_linkedin_profile(page, url)
-
+            scraped_data = scrape_linkedin_profile(page, url, model_provider=model_provider, model_name=model_name)
             row_dict = row.to_dict()
             row_dict["Platform"] = "LinkedIn"
-
-            if scraped_data:
-                row_dict["Name/Handle"] = scraped_data["Handle"]
-                row_dict["FollowerCount"] = scraped_data["FollowerCount"]
-                if row_dict.get("Email") in [None, "", "not exposed"]:
-                    row_dict["Email"] = scraped_data["Email"]
-                row_dict["LastScrapedAt"] = scraped_data["LastScrapedAt"]
-                row_dict["Region"] = scraped_data["Region"] or row_dict.get("Region")
-                row_dict["Language"] = scraped_data["Language"]
-                row_dict["PrimaryAITool"] = scraped_data["PrimaryAITool"] or row_dict.get("PrimaryAITool")
-                row_dict["SampleContentURL"] = scraped_data["SampleContentURL"] or row_dict.get("SampleContentURL")
-                row_dict["AIGCVerdict"] = scraped_data["AIGCVerdict"]
-                row_dict["Notes"] = scraped_data["Notes"]
-                row_dict["FeedURL"] = scraped_data["FeedURL"]
-                row_dict["ContactSourceURL"] = scraped_data["ContactSourceURL"]
-                row_dict["EvidenceJSON"] = scraped_data["EvidenceJSON"]
-
+            row_dict = merge_scraped_row(row_dict, scraped_data)
             updated_rows.append(row_dict)
             time.sleep(2.5)  # Wait 2.5s between requests to prevent IP blocks
 
@@ -205,19 +184,15 @@ def main():
 
     # Save to CSV
     final_df = pd.DataFrame(updated_rows)
-    target_columns = [
-        "ProfileURL", "Name/Handle", "Platform", "FollowerCount", "Email", "Tags",
-        "OutreachStatus", "LastScrapedAt", "Region", "Language", "PrimaryAITool",
-        "SampleContentURL", "AIGCVerdict", "DiscoveredAt", "Source", "Notes",
-        "FeedURL", "ContactSourceURL", "EvidenceJSON"
-    ]
-    for col in target_columns:
-        if col not in final_df.columns:
-            final_df[col] = None
-
-    final_df = final_df[target_columns]
+    final_df = enforce_target_columns(final_df)
     final_df.to_csv(OUTPUT_CSV_FILE, index=False)
     print(f"\n[✓] Completed! Saved {len(final_df)} LinkedIn records to '{OUTPUT_CSV_FILE}'.")
 
+
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--limit", type=int, default=None, help="Max LinkedIn profiles to process")
+    parser.add_argument("--model-provider", type=str, default=None, help="Override MODEL_PROVIDER for this run")
+    parser.add_argument("--model-name", type=str, default=None, help="Override MODEL_NAME for this run")
+    args = parser.parse_args()
+    main(limit=args.limit, model_provider=args.model_provider, model_name=args.model_name)

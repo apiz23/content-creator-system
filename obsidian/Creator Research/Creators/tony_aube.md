@@ -1,56 +1,47 @@
 ---
-name: tony.aube
+name: @tony.aube
 handle: @tony.aube
 platform: TikTok
 profile_url: https://www.tiktok.com/@tony.aube
-followers: 423.6K
-email: Not publicly available
+followers: 423.5K
 category: AIGC,TikTok,AI design,ex-Google AI,small-creator
 language: English
 region: USA (Silicon Valley)
 ai_tools: GenAI
-status: Scraped
+status: active
 discovered_at: 2026-09-01T07:27:58Z
-last_scraped_at: 2026-09-03T02:25:33Z
-last_verified: 2026-09-03
+last_verified: 2026-09-09T03:17:34Z
+last_scraped_at: 2026-09-09T03:17:34Z
 ---
 
-# tony.aube (@tony.aube)
+# @tony.aube
 
 ## Profile
-
 - **Handle:** @tony.aube
 - **Platform:** TikTok
 - **Profile URL:** https://www.tiktok.com/@tony.aube
-- **Follower Count:** 423.6K
-- **Region:** USA (Silicon Valley)
-- **Language:** English
+- **Follower Count:** 423.5K
 
 ## AI / Content
-
-- **AIGC Verdict:** yes
 - **Primary AI Tool:** GenAI
+- **AIGC Verdict:** yes
+- **Language:** English
 - **Tags:** AIGC,TikTok,AI design,ex-Google AI,small-creator
 
 ## Contact
-
-- **Email:** Not publicly available
-- **Contact Source:** https://www.tiktok.com/@tony.aube
+- **Email:** not exposed
+- **Contact Source:** www.tonyaube.com/find-me
 
 ## Evidence
-
 - **Source:** FeedSpot Top 40 AI TikTok Influencers 2026; TikTok profile verified; Snopes fact-check reference
-- **Scraped At:** 2026-09-03T02:25:33Z
-- **Bio Preview:** 🎨 Designer in Silicon Valley
-👨🏻‍💻 Ex Google AI
-👇 Find me elsewhere
-- **External Link:** https://www.tiktok.com/@tony.aube
+- **Sample Content:** www.tonyaube.com/find-me
+- **Evidence:** TikTok scrape: followers=423.5K; bio_link=www.tonyaube.com/find-me
 
-## Notes
-
-TikTok scrape: followers=423.6K; bio_link=www.tonyaube.com/find-me
+## Research Notes
+- **Last Scraped:** 2026-09-09T03:17:34Z
+- **Notes:** TikTok scrape: followers=423.5K; bio_link=www.tonyaube.com/find-me
 
 ## Related
 
 - [[Platforms/TikTok]]
-- [[Daily/2026-09-03]]
+- [[Daily/2026-09-09]]

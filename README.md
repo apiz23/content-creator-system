@@ -1,85 +1,107 @@
-# Creator Research System — Agent Workflow
+# Creator Research System
 
 A safety-first agent workflow for building and maintaining a research
-dataset (in this case, publicly available information about AI content
-creators) through repeated discovery and scraping runs, without ever
-silently losing or fabricating data.
+dataset (publicly available information about AI content creators)
+through repeated discovery and scraping runs, without ever silently
+losing or fabricating data.
 
-This is the generalized version of the internal `AGENTS.md` used to run
-the actual project — the real project's file paths, platform list, CRM
-schema, and scraper code stay private. What's here is the reusable
-*procedure*: the rules that make a long-running, multi-session research
-pipeline trustworthy.
-
-## Why this exists
-
-A dataset that accumulates over many sessions is only as good as the
-guarantees around each session's writes to it. Two failure modes this
-workflow is built to prevent:
-
-- **Silent data loss** — a "refresh" or "sync" accidentally replacing an
-  entire dataset instead of merging into it.
-- **Silent fabrication** — an agent filling in a plausible-looking value
-  (a follower count, a location, an email) that was never actually
-  verified, just to make output look complete.
-
-The rules in `SKILL.md` exist specifically to make both of those hard to
-do by accident.
-
-## What's in this repo
+## Project Structure
 
 ```text
-creator-research-skill/
-├── SKILL.md                              ← the full procedure
-├── assets/
-│   └── AGENTS-template.md                ← template for a new project's facts
-└── references/
-    ├── data-integrity-checklist.md       ← pre-completion verification checklist
-    └── scraping-patterns.md              ← worked example of scraper engineering conventions
+Creator Research System/
+├── AGENTS.md                              ← Agent workflow rules (17 sections)
+├── SOUL.md                                ← Agent identity and purpose
+├── README.md                              ← This file
+├── Code/
+│   └── scraper/
+│       ├── run.py                         ← Unified scraper dispatcher
+│       ├── common.py                      ← Shared utilities (merge_to_crm, normalization)
+│       ├── tiktok.py                      ← TikTok scraper
+│       ├── facebook.py                    ← Facebook scraper
+│       ├── instagram.py                   ← Instagram scraper
+│       ├── linkedin.py                    ← LinkedIn scraper
+│       ├── reddit.py                      ← Reddit scraper
+│       ├── threads.py                     ← Threads scraper
+│       ├── main.py                        ← YouTube scraper
+│       ├── vimeo.py                       ← Vimeo scraper
+│       ├── civitai.py                     ← Civitai scraper
+│       ├── scrape_all.py                  ← All-platform batch scraper
+│       └── model_client.py                ← AI classifier client
+├── data/
+│   ├── input/
+│   │   └── input_channels.csv             ← Persistent scraping queue
+│   ├── output/
+│   │   ├── cron-discovery-log.md          ← Cron job execution log
+│   │   ├── crm-cleanup-report.md          ← CRM cleanup validation report
+│   │   └── *_scraped_output.csv           ← Per-platform scraper outputs
+│   ├── Creator-Intel-CRM-List.csv         ← Master CRM database
+│   └── Creator-Intel-CRM-List.csv.backup  ← Pre-cleanup backup
+├── obsidian/                              ← Knowledge base (in .gitignore)
+│   ├── Creator Research/
+│   │   ├── Creators/                      ← Individual creator notes
+│   │   ├── Platforms/                     ← Platform documentation
+│   │   ├── Daily/                         ← Daily research logs
+│   │   ├── Projects/                      ← Project-specific notes
+│   │   └── Research/                      ← Research findings
+│   └── Attachments/
+└── .gitignore                             ← Ignores obsidian/, .venv/, output CSVs
 ```
 
-- **`SKILL.md`** — the generic procedure: discovery vs. scraping
-  separation, the append-not-replace rule for master data, the
-  no-fabrication rule, the safe-write verification steps, error
-  handling, and reporting format. Doesn't reference this project's real
-  paths or schema.
-- **`AGENTS-template.md`** — what a real project fills in: the actual
-  file paths, supported sources, tech stack, and schema. The real,
-  filled-in version (with this project's actual CRM paths, platform
-  scrapers, and Obsidian structure) is kept private.
+## What This Project Does
 
-## The core discipline, in short
+1. **Discovers** new content creators across platforms (TikTok, Facebook, Instagram, YouTube, LinkedIn, Reddit, Threads, Vimeo, Civitai)
+2. **Scrapes** verified profiles using platform-specific Playwright-based scrapers
+3. **Validates** every record through a mandatory Data Quality Gate before persistence
+4. **Merges** into a master CRM using `merge_to_crm()` with safe-write procedure (read → check duplicate → update/append → validate → verify)
+5. **Synchronizes** to an Obsidian knowledge base with wikilinked notes
+6. **Automates** via scheduled cron jobs with continuity mode
 
-1. **Discovery and scraping are separate operations.** Discovery finds
-   new subjects and queues them; scraping extracts data for subjects
-   already queued. Neither triggers the other unless explicitly asked.
-2. **Master data is append-only by default.** Every write to an
-   authoritative dataset follows: preserve existing data → deduplicate →
-   append new data → verify. "Replace" is never assumed from words like
-   "update," "refresh," or "sync."
-3. **Nothing is fabricated.** Unverifiable fields are marked `Unknown`,
-   never filled with a plausible guess.
-4. **Completion requires verification, not just execution.** A run isn't
-   reported as complete until the write has been re-read from disk and
-   the counts checked — see `references/data-integrity-checklist.md`.
-5. **Failures are reported, not hidden.** A record that couldn't be
-   processed is preserved and marked as failed, not silently dropped
-   from the count.
+## Core Principles
 
-## Applying this to another project
+1. **Discovery and scraping are separate operations.** Discovery finds new subjects and queues them; scraping extracts data for queued subjects.
+2. **Master data is append-only by default.** Every write follows: preserve existing data → deduplicate → append new data → verify.
+3. **Nothing is fabricated.** Unverifiable fields are marked `Unknown`, never filled with a plausible guess.
+4. **Completion requires verification.** A run isn't complete until the write has been re-read from disk and counts checked.
+5. **Failures are reported, not hidden.** Records that couldn't be processed are preserved and marked as failed.
+6. **Data Quality is mandatory.** Every record must pass validation (schema, normalization, deduplication, EvidenceJSON, CSV encoding, column count) before `merge_to_crm()` is called. See AGENTS.md Sections 17-18.
 
-This pattern generalizes to any project where an agent is repeatedly
-appending to a dataset from external sources — not just creator
-research. To adapt it:
+## Key Files
 
-1. Copy `assets/AGENTS-template.md` to `AGENTS.md` and fill in your
-   project's real paths, sources, tech stack, and schema.
-2. Drop `SKILL.md` and `references/` into the project as-is.
-3. Point your agent tool at both files (see your tool's docs for how it
-   discovers/loads instructions and skills).
+- **`AGENTS.md`** — Full agent workflow rules (17 sections covering data safety, normalization, scraping, Obsidian sync, cron jobs, and CRM Data Quality Gate)
+- **`Code/scraper/run.py`** — Unified dispatcher: `python3 Code/scraper/run.py --url <profile-url> --limit 1`
+- **`Code/scraper/common.py`** — Shared utilities including `merge_to_crm()`, `load_and_clean_csv()`, `detect_platform_from_url()`, `extract_email()`
+- **`data/Creator-Intel-CRM-List.csv`** — Master CRM (1049 rows as of Sep 11 2026)
+- **`data/input/input_channels.csv`** — Persistent scraping queue (1001 rows)
+
+## Scraper Usage
+
+```bash
+# Single profile
+python3 Code/scraper/run.py --url https://www.tiktok.com/@example --limit 1
+
+# Platform batch
+python3 Code/scraper/run.py --platform tiktok --limit 5
+
+# All platforms (batch mode)
+python3 Code/scraper/run.py --input data/input/input_channels.csv --limit 10
+```
+
+## Cron Jobs
+
+Scheduled jobs use the `hermes cron` CLI with `--repeat` to auto-terminate:
+```bash
+hermes cron create "every 3m" "..." --name "Creator Research Discovery & Scrape Cycle" --repeat 5 --deliver origin --workdir "/path/to/project" --skill creator-research-system
+```
+
+## Data Safety Rules
+
+- `data/input/input_channels.csv` is NEVER modified directly by scrapers
+- `data/Creator-Intel-CRM-List.csv` is NEVER deleted or replaced
+- `merge_to_crm()` uses case-insensitive ProfileURL matching to prevent duplicates
+- Platform names are normalized to canonical casing (TikTok, Facebook, etc.)
+- EvidenceJSON must be valid RFC 8259 JSON — never Python string representations
+- CSV encoding is always UTF-8 without BOM, using `csv.QUOTE_MINIMAL`
 
 ## Status
 
-This is a generalized, sanitized version of an active internal project
-for sharing with a supervisor/reviewer. It intentionally excludes the
-real scraper code, CRM data, and knowledge-base contents.
+Active internal project. The scraper code, CRM data, and knowledge-base contents are project-private.

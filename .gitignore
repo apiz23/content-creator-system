@@ -52,5 +52,4 @@ logs/
 # data/input/*.csv
 
 # Obsidian - ignore if not versioned
-# obsidian/.obsidian/
-# obsidian/Creator Research/.obsidian/
+obsidian/

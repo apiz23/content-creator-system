@@ -1050,3 +1050,170 @@ Do not delete or replace files without a clear reason. Do not create unnecessary
 The overall objective is to produce creator intelligence that is:
 
 **Accurate + Verifiable + Structured + Reusable + Well-organized.**
+
+---
+
+# 17. CRM DATA QUALITY & CSV FORMATTING
+
+This section ensures every creator record persisted in `data/Creator-Intel-CRM-List.csv` is strictly verified, normalized, schema-compliant, deduplicated, and safe to persist. The system follows a **Validation-Before-Persistence** architecture:
+
+```
+Search → Discover → Verify → Deduplicate → Scrape → Data Quality Gate → merge_to_crm() → Post-Merge CSV Validation
+```
+
+**Do not rely on downstream cleanup scripts.** If a record fails validation and cannot be safely normalized, reject it.
+
+## 17.1 CSV Data Contract & Schema Guardrails
+
+Before preparing any record for CRM insertion, enforce the active schema:
+
+- **Strict Column Order & Count:** Do not alter the existing column ordering, add arbitrary columns, rename headers, or drop fields. Every record must match the exact column count of the header row.
+- **Empty Field Handling:** If a value is unavailable or unverified, use the CRM's standard null/empty representation (empty string `""`). Do not inject placeholders like `"N/A"`, `"None"`, `"null"`, or `"Unknown"`.
+- **Prohibited Injections:** Normal creator fields must never contain:
+  - Python dictionaries, tuples, or lists (e.g., `['tag1', 'tag2']`)
+  - Raw unescaped JSON
+  - Debugging logs, stack traces, or scraper error dumps
+  - Model reasoning or chain-of-thought traces
+  - Raw search engine SERP snippets
+  - HTML, CSS, or navigation tags
+  - Platform interface noise
+
+## 17.2 Normalization Rules
+
+### Platform Names
+Enforce canonical casing:
+- Civitai, Facebook, Instagram, LinkedIn, Reddit, Threads, TikTok, Vimeo, YouTube
+
+Transform common variations (e.g., `tiktok`, `TIKTOK` → `TikTok`; `fb`, `facebook` → `Facebook`). Preserve verified niche platforms only when accompanied by explicit evidence.
+
+### Handles
+- Normalize handles uniformly across all lookups (e.g., strip redundant `@` prefixes, spaces, and trailing symbols during matching).
+- Never store complete profile URLs, tracking queries, or internal database keys as the `Handle` unless the platform strictly uses that identifier.
+- Store canonical profile URLs in the dedicated URL column, completely separated from the handle.
+
+### Creator & Channel Names
+- Extract the genuine human, brand, or channel display name.
+- Explicitly reject platform navigation text, page titles representing errors (e.g., "Page Not Found", "Log In / Sign Up"), raw numeric user IDs (e.g., Facebook internal numeric IDs like `100088664633967`), and SERP titles.
+
+## 17.3 Profile URL Sanitization
+
+- Strip all tracking parameters (`utm_*`, `fbclid`, `si`, `ref`, etc.) and non-essential hash fragments.
+- Store canonical profile/channel base URLs only.
+- **Strict Rejection:** Never store search engine URLs (Google, Bing), platform search queries (e.g., `tiktok.com/search?q=...`), hashtag feeds, or generic directory aggregators as creator URLs.
+
+## 17.4 Pre-Scrape & Pre-Merge Deduplication
+
+Before spending compute to scrape or attempting to merge, perform case-insensitive duplicate checks across:
+1. `data/input/input_channels.csv`
+2. `data/Creator-Intel-CRM-List.csv`
+
+Matching criteria:
+- Same platform + matching handle (case-insensitive, e.g., `@CreatorName` == `@creatorname`)
+- Matching canonical profile URL
+- Confirmed alias or matching channel ID
+
+If a match is found in either file, mark it as a duplicate and skip insertion.
+
+## 17.5 Discovery & Search Result Validation
+
+Search results are leads, not verified records:
+1. Confirm the creator profile actually exists and belongs to a real entity matching the research criteria.
+2. Extract bio, handles, and metadata directly from the source profile, not from search engine preview snippets.
+3. Reject generic landing pages, topic/category hubs, community group sidebars, and spam directories.
+
+## 17.6 The Scraped Data Quality Gate
+
+After running the scraper (e.g., `python3 Code/scraper/run.py --url <profile-url> --limit 1`), inspect the output before touching the CRM:
+
+- **Facebook Artifact Detection:** Detect and eliminate common scraped UI/navigation artifacts (e.g., `Lagi`, `Rakan`, `Foto`, `Perihal`, `Pekerjaan`, `mengikuti`, `Siaran`, `tempat ker`, `Tiada`). Only strip these tokens when they represent platform UI noise—never truncate legitimate creator bios.
+- **Content Integrity:** Verify fields contain substantive human text. If scraping fails or hits a login wall, reject the payload rather than persisting garbage or partial UI text.
+
+## 17.7 EvidenceJSON Formatting
+
+- Must parse as valid RFC 8259 JSON.
+- Never output Python string representations (e.g., do not output `{'status': 'verified'}`). Use valid double-quoted JSON: `{"status": "verified"}`.
+- Properly escape all internal quotes, backslashes, and line breaks so they do not fracture CSV columns.
+- If evidence is malformed and cannot be reliably parsed or reconstructed, drop the invalid segment rather than saving corrupted text.
+
+## 17.8 CSV Encoding & Delimiter Safety
+
+- **Tooling Contract:** Never construct or append CSV rows using manual string formatting or raw string concatenation.
+- **Escaping:** Use standard CSV libraries (`csv.writer` with `csv.QUOTE_MINIMAL` or `csv.QUOTE_ALL`) to safely encapsulate fields containing commas, line breaks, emojis, and quotes.
+- **Character Encoding:** Always read and write using `utf-8` without BOM. Ensure international text, Malay terms, and Unicode characters remain uncorrupted.
+
+## 17.9 Column Count & Header Integrity
+
+- **Header Locking:** The CSV header line is immutable. Never duplicate, append, or re-insert header rows into the data body.
+- **Row Width Invariant:** If the header defines $N$ columns, every single row written to the file must parse to exactly $N$ fields.
+- **Immediate Abort:** If an output row produces $N \pm 1$ columns, abort the merge immediately, roll back the write, and flag the faulty record.
+
+## 17.10 Merge Safety & Target Invariants
+
+- **Controlled Ingestion:** Never bypass the designated `merge_to_crm()` utility. All writes must go through this centralized merge path.
+- **Protected Files:** `data/input/input_channels.csv` is read-only for this process. Never modify, overwrite, or delete input records.
+- **Update Behavior:** When merging new information for an existing creator, preserve established, verified records. Do not overwrite populated fields with empty values or lower-confidence data.
+
+## 17.11 Failure Handling
+
+If an entry fails any validation step:
+1. **Drop / Skip:** Do not attempt to force, fabricate, or guess missing information.
+2. **Log:** Note the specific failure mode (e.g., `[SKIP] Invalid handle format: <val>`, `[SKIP] Duplicate detected: <val>`, `[REJECT] Failed JSON contract`).
+3. **Proceed:** Move cleanly to the next candidate in the queue.
+
+## 17.12 Operational Rule for Cron & Agent Execution
+
+When processing channels:
+1. Execute discovery and run scraper targets.
+2. Route every record through the Data Quality Gate.
+3. Pass valid candidates to `merge_to_crm()`.
+4. Run a read-only post-merge validation pass confirming row column counts and UTF-8 integrity.
+5. If any row corrupts the CSV structure, immediately revert the file to its pre-run state.
+
+---
+
+# 18. CRM DATA QUALITY GATE — MANDATORY ENFORCEMENT
+
+The CRM Data Quality & CSV Formatting rules from Section 17 are mandatory for EVERY creator discovery, scraping, enrichment, and CRM merge operation.
+
+No creator record may be written to `data/Creator-Intel-CRM-List.csv` until it has passed all applicable validation checks.
+
+## 18.1 Mandatory Processing Order
+
+1. Discover creator
+2. Verify creator profile
+3. Normalize platform, handle, name, and URL
+4. Check duplicates against:
+   - `data/input/input_channels.csv`
+   - `data/Creator-Intel-CRM-List.csv`
+5. Scrape using the approved scraper workflow
+6. Validate scraped fields
+7. Validate EvidenceJSON
+8. Validate CSV-safe formatting
+9. Validate column count/schema
+10. Call the existing `merge_to_crm()` logic
+11. Validate the CRM again after merge
+
+## 18.2 Hard Rules
+
+- **NEVER** bypass `merge_to_crm()`.
+- **NEVER** manually append raw CSV rows.
+- **NEVER** modify `data/input/input_channels.csv`.
+- **NEVER** invent missing creator information.
+- **NEVER** insert uncertain or malformed records.
+- **NEVER** allow invalid JSON into `EvidenceJSON`.
+- **NEVER** allow a row with an incorrect column count into the CRM.
+- **NEVER** allow search-result URLs to enter the CRM.
+- **NEVER** overwrite verified CRM values unnecessarily.
+
+## 18.3 Failure Protocol
+
+If a record fails validation:
+```
+REJECT → LOG REASON → SKIP RECORD → CONTINUE
+```
+
+Do not "fix" uncertain information by guessing.
+
+## 18.4 Cron Execution
+
+For cron execution, the same rules apply to every run. Each scheduled run must independently validate every record through the full Data Quality Gate before any merge_to_crm() call.

@@ -59,6 +59,20 @@ This project includes a native Hermes Plugin that exposes the scraper system as 
 | `creator_batch_scrape` | Rescrape creators from Master CRM. Always creates backup first. |
 | `creator_validate` | Validate Master CRM data quality. |
 
+### Supported Platforms
+
+| Platform | File | Method |
+|----------|------|--------|
+| TikTok | `code/scraper/tiktok.py` | Playwright |
+| Instagram | `code/scraper/instagram.py` | Playwright |
+| Facebook | `code/scraper/facebook.py` | Playwright |
+| LinkedIn | `code/scraper/linkedin.py` | Playwright |
+| Reddit | `code/scraper/reddit.py` | Playwright |
+| Threads | `code/scraper/threads.py` | Playwright |
+| YouTube | `code/scraper/main.py` | yt-dlp |
+| Vimeo | `code/scraper/vimeo.py` | yt-dlp |
+| Civitai | `code/scraper/civitai.py` | API |
+
 ### Architecture
 
 ```
@@ -103,6 +117,46 @@ hermes chat -q "Scrape all Instagram profiles from the CRM"
 
 # Validate data quality
 hermes chat -q "Validate the CRM for duplicates and missing data"
+```
+
+### Example Prompts
+
+#### Search & Discover Creators
+```
+"Find 5 AI video creators on TikTok"
+"Search for AI artists on Instagram with more than 10K followers"
+"Discover 10 YouTube channels about machine learning"
+"Find AI content creators on TikTok and scrape their profiles"
+```
+
+#### Scrape Single Creator
+```
+"Scrape this TikTok profile: https://www.tiktok.com/@example"
+"Extract data from https://www.instagram.com/ai_artist"
+"Refresh this creator's information"
+```
+
+#### Batch Scrape from CRM
+```
+"Rescrape all existing TikTok creators"
+"Refresh all Instagram profiles in the CRM"
+"Batch scrape 10 creators from the CRM"
+"Rescrape all creators (limit 5 per platform)"
+```
+
+#### Validate Data
+```
+"Check the CRM for duplicates"
+"Validate data quality"
+"Show me CRM statistics"
+"Find missing URLs in the CRM"
+```
+
+#### Discovery Slash Command
+```
+/creator-discover platform:tiktok keywords:"AI video" count:5
+/creator-discover platform:instagram keywords:"AI art" count:10
+/creator-discover platform:youtube keywords:"machine learning" count:20
 ```
 
 ### Dependencies

@@ -354,39 +354,39 @@ The input CSV is the source of truth for scraping.
 
 Each scraper is a standalone Python script run with `python3 <file>` from the repo root (or the `.venv` activated). All 10 scripts read from `data/input/input_channels.csv`, filter by platform, and write to their platform-specific output CSV. There are no CLI arguments, flags, or subcommands — every scraper processes the entire filtered input file at once.
 
-**`Code/scraper/run.py`** is the unified dispatcher. It supports three modes: `--platform`, `--url`, and `--input` (full-CSV batch). After dispatching each profile, `run.py` automatically merges results into `data/Creator-Intel-CRM-List.csv` using the safe-write procedure (read → check duplicate by ProfileURL → update or append → validate → write → re-read to verify). `run.py` also writes intermediate results to `data/output/run_dispatch_output.csv` (URL mode) or `data/output/batch_dispatch_output.csv` (batch mode).
+**`code/scraper/run.py`** is the unified dispatcher. It supports three modes: `--platform`, `--url`, and `--input` (full-CSV batch). After dispatching each profile, `run.py` automatically merges results into `data/Creator-Intel-CRM-List.csv` using the safe-write procedure (read → check duplicate by ProfileURL → update or append → validate → write → re-read to verify). `run.py` also writes intermediate results to `data/output/run_dispatch_output.csv` (URL mode) or `data/output/batch_dispatch_output.csv` (batch mode).
 
 || Platform | Script | Input | Output | Preconditions | Delay |
 |---|---|---|---|---|---|
-| **Civitai** | `Code/scraper/civitai.py` | `data/input/input_channels.csv` | `data/output/civitai_scraped_output.csv` | No browser needed. Public API. Requires `requests`, `pandas`. | 1s |
-| **Facebook** | `Code/scraper/facebook.py` | `data/input/input_channels.csv` | `data/output/facebook_scraped_output.csv` | Playwright + Chromium installed. Requires `playwright`, `requests`, `pandas`. | 2s |
-| **Instagram** | `Code/scraper/instagram.py` | `data/input/input_channels.csv` | `data/output/instagram_scraped_output.csv` | Playwright + Chromium installed. Requires `playwright`, `requests`, `pandas`. | 3s |
-| **LinkedIn** | `Code/scraper/linkedin.py` | `data/input/input_channels.csv` | `data/output/linkedin_scraped_output.csv` | Playwright + Chromium installed. Requires `playwright`, `requests`, `pandas`. | 2.5s |
-| **Reddit** | `Code/scraper/reddit.py` | `data/input/input_channels.csv` | `data/output/reddit_scraped_output.csv` | Playwright + Chromium installed. Requires `playwright`, `requests`, `pandas`. | 1.5s |
-| **Threads** | `Code/scraper/threads.py` | `data/input/input_channels.csv` | `data/output/threads_scraped_output.csv` | Playwright + Chromium installed. Requires `playwright`, `requests`, `pandas`. | 1.5s |
-| **TikTok** | `Code/scraper/tiktok.py` | `data/input/input_channels.csv` | `data/output/tiktok_scraped_output.csv` | Playwright + Chromium installed. Requires `playwright`, `requests`, `pandas`. | 2s |
-| **YouTube** | `Code/scraper/main.py` | `data/input/input_channels.csv` | `data/output/youtube_refreshed_output.csv` | `yt-dlp` installed (`.venv/bin/yt-dlp`). No browser needed. Requires `yt-dlp`, `requests`, `pandas`. | None (yt-dlp self-manages) |
-| **Vimeo** | `Code/scraper/vimeo.py` | `data/input/input_channels.csv` | `data/output/vimeo_scraped_output.csv` | `yt-dlp` installed (`.venv/bin/yt-dlp`). No browser needed. Requires `yt-dlp`, `requests`, `pandas`. | 1s |
-| **All-in-one** | `Code/scraper/scrape_all.py` | `data/input/input_channels.csv` | `data/output/all_scraped_output.csv` | Playwright + Chromium + `yt-dlp` installed. Supports all platforms in one pass. | Varies by platform order |
+| **Civitai** | `code/scraper/civitai.py` | `data/input/input_channels.csv` | `data/output/civitai_scraped_output.csv` | No browser needed. Public API. Requires `requests`, `pandas`. | 1s |
+| **Facebook** | `code/scraper/facebook.py` | `data/input/input_channels.csv` | `data/output/facebook_scraped_output.csv` | Playwright + Chromium installed. Requires `playwright`, `requests`, `pandas`. | 2s |
+| **Instagram** | `code/scraper/instagram.py` | `data/input/input_channels.csv` | `data/output/instagram_scraped_output.csv` | Playwright + Chromium installed. Requires `playwright`, `requests`, `pandas`. | 3s |
+| **LinkedIn** | `code/scraper/linkedin.py` | `data/input/input_channels.csv` | `data/output/linkedin_scraped_output.csv` | Playwright + Chromium installed. Requires `playwright`, `requests`, `pandas`. | 2.5s |
+| **Reddit** | `code/scraper/reddit.py` | `data/input/input_channels.csv` | `data/output/reddit_scraped_output.csv` | Playwright + Chromium installed. Requires `playwright`, `requests`, `pandas`. | 1.5s |
+| **Threads** | `code/scraper/threads.py` | `data/input/input_channels.csv` | `data/output/threads_scraped_output.csv` | Playwright + Chromium installed. Requires `playwright`, `requests`, `pandas`. | 1.5s |
+| **TikTok** | `code/scraper/tiktok.py` | `data/input/input_channels.csv` | `data/output/tiktok_scraped_output.csv` | Playwright + Chromium installed. Requires `playwright`, `requests`, `pandas`. | 2s |
+| **YouTube** | `code/scraper/main.py` | `data/input/input_channels.csv` | `data/output/youtube_refreshed_output.csv` | `yt-dlp` installed (`.venv/bin/yt-dlp`). No browser needed. Requires `yt-dlp`, `requests`, `pandas`. | None (yt-dlp self-manages) |
+| **Vimeo** | `code/scraper/vimeo.py` | `data/input/input_channels.csv` | `data/output/vimeo_scraped_output.csv` | `yt-dlp` installed (`.venv/bin/yt-dlp`). No browser needed. Requires `yt-dlp`, `requests`, `pandas`. | 1s |
+| **All-in-one** | `code/scraper/scrape_all.py` | `data/input/input_channels.csv` | `data/output/all_scraped_output.csv` | Playwright + Chromium + `yt-dlp` installed. Supports all platforms in one pass. | Varies by platform order |
 |---|---|---|---|---|---|
-| **Flag** | **All platforms** | — | — | `python3 Code/scraper/<platform>.py --limit N` processes only the first `N` matching rows for that platform after platform filtering, in memory; omitting it processes all matching rows and preserves current behavior. `input_channels.csv` is never modified by a scraper run. |
+| **Flag** | **All platforms** | — | — | `python3 code/scraper/<platform>.py --limit N` processes only the first `N` matching rows for that platform after platform filtering, in memory; omitting it processes all matching rows and preserves current behavior. `input_channels.csv` is never modified by a scraper run. |
 
 ### Invocation command
 
 ```bash
-python3 Code/scraper/<platform>.py
+python3 code/scraper/<platform>.py
 ```
 
 Example:
 ```bash
-python3 Code/scraper/tiktok.py
+python3 code/scraper/tiktok.py
 ```
 
 There are no CLI arguments. Every scraper reads the entire `data/input/input_channels.csv`, filters rows matching its platform, processes all matching rows, and writes the output CSV. To limit which creators get scraped, filter the input CSV before running the scraper.
 
 ### Environment variables
 
-All scrapers that use the AI classifier read from `Code/scraper/model_client.py`, which loads `.env` from the project root. Required variables:
+All scrapers that use the AI classifier read from `code/scraper/model_client.py`, which loads `.env` from the project root. Required variables:
 - `MODEL_PROVIDER` (default `ollama`)
 - `MODEL_NAME` (default `qwen3.5:latest`)
 - `OLLAMA_BASE_URL` (default `http://localhost:11434`)
@@ -420,7 +420,7 @@ Before running any scraper:
 
 After scraping completes:
 1. **Verify output CSV**: Check `data/output/<platform>_scraped_output.csv` exists and has the expected row count.
-2. **Sync to CRM**: Run `Code/scraper/sync_tiktok_crm.py` (or the equivalent sync script for the platform) to merge output into `data/Creator-Intel-CRM-List.csv` and sync Obsidian notes.
+2. **Sync to CRM**: Run `code/scraper/sync_tiktok_crm.py` (or the equivalent sync script for the platform) to merge output into `data/Creator-Intel-CRM-List.csv` and sync Obsidian notes.
 3. **Update Obsidian**: Sync creator notes, platform notes, and daily log.
 4. **Report counts**: Successful records, failed records, new vs. updated in CRM.
 
@@ -824,7 +824,7 @@ Before creating a new scraper:
 4. Reuse existing utilities where possible
 5. Create new code only when necessary
 
-Typical scraper location: `Code/scraper/`
+Typical scraper location: `code/scraper/`
 
 ## 8.2 Modifying Scrapers
 
@@ -914,7 +914,7 @@ The actual project structure:
 Creator Research System/
 ├── AGENTS.md
 ├── SOUL.md
-├── Code/
+├── code/
 │   └── scraper/
 │       ├── civitai.py
 │       ├── facebook.py
@@ -958,7 +958,7 @@ IMPORTANT:
 - The output directory is `data/output/`
 - The Obsidian vault is `obsidian/Creator Research/`
 - Creator notes are stored in `obsidian/Creator Research/Creators/`
-- Scrapers are stored in `Code/scraper/`
+- Scrapers are stored in `code/scraper/`
 
 Do not invent alternative directories unless the user explicitly requests a restructuring.
 
@@ -1123,7 +1123,7 @@ Search results are leads, not verified records:
 
 ## 17.6 The Scraped Data Quality Gate
 
-After running the scraper (e.g., `python3 Code/scraper/run.py --url <profile-url> --limit 1`), inspect the output before touching the CRM:
+After running the scraper (e.g., `python3 code/scraper/run.py --url <profile-url> --limit 1`), inspect the output before touching the CRM:
 
 - **Facebook Artifact Detection:** Detect and eliminate common scraped UI/navigation artifacts (e.g., `Lagi`, `Rakan`, `Foto`, `Perihal`, `Pekerjaan`, `mengikuti`, `Siaran`, `tempat ker`, `Tiada`). Only strip these tokens when they represent platform UI noise—never truncate legitimate creator bios.
 - **Content Integrity:** Verify fields contain substantive human text. If scraping fails or hits a login wall, reject the payload rather than persisting garbage or partial UI text.

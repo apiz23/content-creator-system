@@ -12,7 +12,7 @@ Creator Research System/
 ├── AGENTS.md                              ← Agent workflow rules (17 sections)
 ├── SOUL.md                                ← Agent identity and purpose
 ├── README.md                              ← This file
-├── Code/
+├── code/
 │   └── scraper/
 │       ├── run.py                         ← Unified scraper dispatcher
 │       ├── common.py                      ← Shared utilities (merge_to_crm, normalization)
@@ -68,8 +68,8 @@ Creator Research System/
 ## Key Files
 
 - **`AGENTS.md`** — Full agent workflow rules (17 sections covering data safety, normalization, scraping, Obsidian sync, cron jobs, and CRM Data Quality Gate)
-- **`Code/scraper/run.py`** — Unified dispatcher: `python3 Code/scraper/run.py --url <profile-url> --limit 1`
-- **`Code/scraper/common.py`** — Shared utilities including `merge_to_crm()`, `load_and_clean_csv()`, `detect_platform_from_url()`, `extract_email()`
+- **`code/scraper/run.py`** — Unified dispatcher: `python3 code/scraper/run.py --url <profile-url> --limit 1`
+- **`code/scraper/common.py`** — Shared utilities including `merge_to_crm()`, `load_and_clean_csv()`, `detect_platform_from_url()`, `extract_email()`
 - **`data/Creator-Intel-CRM-List.csv`** — Master CRM (1049 rows as of Sep 11 2026)
 - **`data/input/input_channels.csv`** — Persistent scraping queue (1001 rows)
 
@@ -77,13 +77,13 @@ Creator Research System/
 
 ```bash
 # Single profile
-python3 Code/scraper/run.py --url https://www.tiktok.com/@example --limit 1
+python3 code/scraper/run.py --url https://www.tiktok.com/@example --limit 1
 
 # Platform batch
-python3 Code/scraper/run.py --platform tiktok --limit 5
+python3 code/scraper/run.py --platform tiktok --limit 5
 
 # All platforms (batch mode)
-python3 Code/scraper/run.py --input data/input/input_channels.csv --limit 10
+python3 code/scraper/run.py --input data/input/input_channels.csv --limit 10
 ```
 
 ## Cron Jobs

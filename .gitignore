@@ -53,3 +53,16 @@ logs/
 
 # Obsidian - ignore if not versioned
 obsidian/
+
+# Code scrapers
+code/scraper/__pycache__/
+
+# Scratch/one-off scripts (deleted)
+scripts/
+
+# Backup folder (tracked manually when needed)
+data/backup/
+
+# Stale output files
+data/output/*_2026-*.csv
+data/output/fb_batch*.csv

@@ -91,16 +91,24 @@ Existing CRM merge (common.py) + backup
 data/Creator-Intel-CRM-List.csv (SINGLE SOURCE OF TRUTH)
 ```
 
-### Installing as a Hermes Plugin
+### Installation
 
 ```bash
-# Copy the project to your Hermes plugins directory
+# 1. Clone the repository
+git clone https://github.com/apiz23/content-creator-system.git
+cd content-creator-system
+
+# 2. Install dependencies
+pip install -r requirements.txt
+playwright install chromium
+
+# 3. Copy to Hermes plugins directory
 cp -r . ~/.hermes/plugins/content-creator-system
 
-# Enable the plugin
+# 4. Enable the plugin
 hermes plugins enable content-creator-system
 
-# Verify it's loaded
+# 5. Verify it's loaded
 hermes plugins list
 ```
 

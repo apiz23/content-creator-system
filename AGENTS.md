@@ -156,6 +156,13 @@ Perform discovery ONLY when the user explicitly asks to:
 
 Do NOT automatically discover during a normal scrape.
 
+## 3.1.1 Search vs Discovery
+
+- "search for creators" or "search for new creators" → triggers discovery (web search for new creators)
+- "search" alone (without "for creators") → search EXISTING records in input CSV / CRM / Obsidian for a specific creator. Does NOT trigger discovery.
+- If the user says just "search" without specifying existing vs new, default to DISCOVERING new creators (treat as "search for new creators").
+- "scrape" → runs the scraper on existing input queue. Does NOT trigger discovery.
+
 ## 3.2 Discovery Source
 
 Discovery may use:

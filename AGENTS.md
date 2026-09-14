@@ -227,12 +227,14 @@ When a creator is discovered and verified:
 
 ## 3.7 Discovery → Obsidian
 
-After discovering a creator, create/update:
+After discovering a creator, IF the Obsidian vault exists at `obsidian/Creator Research/`:
 
-- `obsidian/Creator Research/Creators/<handle>.md`
-- `obsidian/Creator Research/Platforms/<Platform>.md`
-- `obsidian/Creator Research/Daily/YYYY-MM-DD.md`
+- Create/update `obsidian/Creator Research/Creators/<handle>.md`
+- Create/update `obsidian/Creator Research/Platforms/<Platform>.md`
+- Create/update `obsidian/Creator Research/Daily/YYYY-MM-DD.md`
 - Check relevant Projects and Research if applicable
+
+If Obsidian vault does not exist, skip Obsidian sync and continue with CSV/CRM updates only.
 
 Clearly distinguish DISCOVERED information from SCRAPED information.
 
@@ -466,7 +468,7 @@ For every creator in the output:
 
 ## 4.6 Scrape → Obsidian Sync
 
-After EVERY successful scraping run:
+After EVERY successful scraping run, IF the Obsidian vault exists at `obsidian/Creator Research/`:
 
 ### Creator Notes (`obsidian/Creator Research/Creators/`)
 
@@ -510,6 +512,8 @@ Create/update `Daily/YYYY-MM-DD.md` with:
 - Update Projects only when associated with an existing project
 - Update Research only when scrape produces meaningful research findings
 - Do NOT create unnecessary project notes
+
+**If Obsidian vault does not exist**, skip all Obsidian sync steps and continue with CRM update only.
 
 ## 4.7 Scrape Completion
 

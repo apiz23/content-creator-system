@@ -29,13 +29,13 @@ Creator Research System/
 │       └── model_client.py                ← AI classifier client
 ├── data/
 │   ├── input/
-│   │   └── input_channels.csv             ← Persistent scraping queue
+│   │   └── input_channels.csv             ← Legacy (deprecated, not required by workflow)
 │   ├── output/
 │   │   ├── cron-discovery-log.md          ← Cron job execution log
 │   │   ├── crm-cleanup-report.md          ← CRM cleanup validation report
 │   │   └── *_scraped_output.csv           ← Per-platform scraper outputs
-│   ├── Creator-Intel-CRM-List.csv         ← Master CRM database
-│   └── Creator-Intel-CRM-List.csv.backup  ← Pre-cleanup backup
+│   ├── Creator-Intel-CRM-List.csv         ← Master CRM (SINGLE SOURCE OF TRUTH)
+│   └── backups/                           ← Timestamped CRM backups
 ├── obsidian/                              ← Knowledge base (in .gitignore)
 │   ├── Creator Research/
 │   │   ├── Creators/                      ← Individual creator notes
@@ -47,7 +47,83 @@ Creator Research System/
 └── .gitignore                             ← Ignores obsidian/, .venv/, output CSVs
 ```
 
-## What This Project Does
+## Hermes Plugin
+
+This project includes a native Hermes Plugin that exposes the scraper system as callable tools.
+
+### Available Tools
+
+| Tool | Description |
+|------|-------------|
+| `creator_scrape` | Scrape one public creator profile URL. Returns structured data. |
+| `creator_batch_scrape` | Rescrape creators from Master CRM. Always creates backup first. |
+| `creator_validate` | Validate Master CRM data quality. |
+
+### Architecture
+
+```
+Hermes Agent
+    ↓
+Plugin Tools (creator_scrape, creator_batch_scrape, creator_validate)
+    ↓
+plugin.yaml + __init__.py + schemas.py + tools.py
+    ↓
+Existing code/scraper/run.py dispatcher
+    ↓
+Existing platform scrapers (tiktok, instagram, facebook, etc.)
+    ↓
+Existing CRM merge (common.py) + backup
+    ↓
+data/Creator-Intel-CRM-List.csv (SINGLE SOURCE OF TRUTH)
+```
+
+### Installing as a Hermes Plugin
+
+```bash
+# Copy the project to your Hermes plugins directory
+cp -r . ~/.hermes/plugins/content-creator-system
+
+# Enable the plugin
+hermes plugins enable content-creator-system
+
+# Verify it's loaded
+hermes plugins list
+```
+
+### Using the Plugin
+
+Once enabled, the tools appear automatically in your Hermes session:
+
+```
+# Scrape a single profile
+hermes chat -q "Scrape https://www.tiktok.com/@example"
+
+# Batch scrape Instagram
+hermes chat -q "Scrape all Instagram profiles from the CRM"
+
+# Validate data quality
+hermes chat -q "Validate the CRM for duplicates and missing data"
+```
+
+### Dependencies
+
+The plugin requires these Python packages (same as the main project):
+
+- pandas >= 2.0
+- requests >= 2.28
+- playwright >= 1.40
+- python-dotenv >= 1.0
+- yt-dlp >= 2024.1
+
+Install them with:
+
+```bash
+pip install pandas requests playwright python-dotenv yt-dlp
+```
+
+### Configuration
+
+No additional configuration is required. The plugin resolves paths relative to its own location, so it works regardless of your current working directory.
 
 1. **Discovers** new content creators across platforms (TikTok, Facebook, Instagram, YouTube, LinkedIn, Reddit, Threads, Vimeo, Civitai)
 2. **Scrapes** verified profiles using platform-specific Playwright-based scrapers
@@ -70,7 +146,7 @@ Creator Research System/
 - **`AGENTS.md`** — Full agent workflow rules (17 sections covering data safety, normalization, scraping, Obsidian sync, cron jobs, and CRM Data Quality Gate)
 - **`code/scraper/run.py`** — Unified dispatcher: `python3 code/scraper/run.py --url <profile-url> --limit 1`
 - **`code/scraper/common.py`** — Shared utilities including `merge_to_crm()`, `load_and_clean_csv()`, `detect_platform_from_url()`, `extract_email()`
-- **`data/Creator-Intel-CRM-List.csv`** — Master CRM (1049 rows as of Sep 11 2026)
+- **`data/Creator-Intel-CRM-List.csv`** — Master CRM (1053 rows as of Sep 14 2026)
 - **`data/input/input_channels.csv`** — Persistent scraping queue (1001 rows)
 
 ## Scraper Usage

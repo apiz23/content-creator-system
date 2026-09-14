@@ -1,9 +1,15 @@
 import re
+import shutil
 from pathlib import Path
+from datetime import datetime
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
 INPUT_CSV_FILE = PROJECT_ROOT / "data/input/input_channels.csv"
+
+CRM_FILE = PROJECT_ROOT / "data/Creator-Intel-CRM-List.csv"
+
+BACKUP_DIR = PROJECT_ROOT / "data/backups"
 
 TARGET_COLUMNS = [
     "ProfileURL", "Name/Handle", "Platform", "FollowerCount", "Email",
@@ -181,6 +187,48 @@ def merge_to_crm(result_dict, crm_path=None):
 
     return (before_count, after_count, action)
 
+def backup_crm(crm_path=None):
+    """Create a timestamped backup of the Master CRM before modification.
+    
+    Returns the backup file path.
+    Raises RuntimeError if backup creation fails.
+    """
+    if crm_path is None:
+        crm_path = CRM_FILE
+    
+    crm_path = Path(crm_path)
+    
+    if not crm_path.exists():
+        raise RuntimeError(f"CRM file not found: {crm_path}")
+    
+    # Ensure backup directory exists
+    BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+    
+    # Generate timestamped filename
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    backup_name = f"{crm_path.stem}_{timestamp}{crm_path.suffix}"
+    backup_path = BACKUP_DIR / backup_name
+    
+    # Ensure we don't overwrite existing backup
+    counter = 1
+    while backup_path.exists():
+        backup_name = f"{crm_path.stem}_{timestamp}_{counter}{crm_path.suffix}"
+        backup_path = BACKUP_DIR / backup_name
+        counter += 1
+    
+    # Copy CRM to backup
+    try:
+        shutil.copy2(crm_path, backup_path)
+    except Exception as e:
+        raise RuntimeError(f"Failed to create CRM backup: {e}")
+    
+    # Verify backup
+    if not backup_path.exists():
+        raise RuntimeError(f"Backup file not created: {backup_path}")
+    
+    return str(backup_path)
+
+
 def merge_results_to_crm(results_df, crm_path=None):
     """Merge multiple scraped results (from a DataFrame) into the master CRM.
 
@@ -190,7 +238,7 @@ def merge_results_to_crm(results_df, crm_path=None):
     import pandas as pd
 
     if crm_path is None:
-        crm_path = PROJECT_ROOT / "data" / "Creator-Intel-CRM-List.csv"
+        crm_path = CRM_FILE
 
     before_count = len(pd.read_csv(crm_path)) if Path(crm_path).exists() else 0
     updated = 0

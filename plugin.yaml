@@ -1,0 +1,24 @@
+name: content-creator-system
+version: 1.0.0
+description: >
+  A content creator research and intelligence system for discovering,
+  scraping, validating, and organizing publicly available creator data.
+  Provides tools to scrape individual profiles, run batch scraping operations,
+  and validate data quality across the creator CRM.
+
+author: Hafiz
+license: MIT
+homepage: https://github.com/apiz23/content-creator-system
+tags: [creator, research, scraping, crm, data-quality]
+
+provides_tools:
+  - creator_scrape
+  - creator_batch_scrape
+  - creator_validate
+
+python_dependencies:
+  - "pandas>=2.0,<3"
+  - "requests>=2.28,<3"
+  - "playwright>=1.40,<2"
+  - "python-dotenv>=1.0,<2"
+  - "yt-dlp>=2024.1,<2026"

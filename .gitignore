@@ -28,7 +28,7 @@ ENV/
 
 # Environment variables / secrets
 .env
-.env.*
+# .env.* (template, not secrets)
 *.env.local
 
 # IDE
@@ -60,9 +60,10 @@ code/scraper/__pycache__/
 # Scratch/one-off scripts (deleted)
 scripts/
 
-# Backup folder (tracked manually when needed)
-data/backup/
+# Backup folder
+data/backups/
 
 # Stale output files
 data/output/*_2026-*.csv
 data/output/fb_batch*.csv
+data/output/batch_dispatch_output.csv

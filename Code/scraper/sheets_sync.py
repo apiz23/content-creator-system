@@ -1,28 +1,47 @@
 """Optional Google Sheets sync module.
 
 Pushes newly-merged CRM rows to a Google Sheet tab after merge_to_crm()
-succeeds. Fully configured via .env. Fails gracefully — never blocks
-the scrape if credentials are missing or the API call errors out.
+succeeds. Supports both Service Account and OAuth2 installed app credentials.
+Fails gracefully — never blocks the scrape if credentials are missing or
+the API call errors out.
 
-Auth: Service Account JSON credentials (GOOGLE_SHEETS_CREDENTIALS_PATH).
-A plain API key is read-only and CANNOT write to Sheets.
+Auth methods:
+- Service Account JSON: GOOGLE_SHEETS_CREDENTIALS_PATH points to JSON with
+  "type": "service_account" (best for cron/CLI, no user interaction)
+- OAuth2 Installed App: GOOGLE_SHEETS_CREDENTIALS_PATH points to JSON with
+  "installed": {...} (requires one-time browser auth, token cached locally)
 """
 
 import os
 import sys
+import json
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from common import PROJECT_ROOT
 
-# Lazy import — only loaded if GOOGLE_SHEETS_ENABLED=true
+# --- Lazy imports ---
 try:
     import gspread
-    from google.oauth2.service_account import Credentials as _GSCredentials
     _GS_AVAILABLE = True
 except ImportError:
     _GS_AVAILABLE = False
-    _GSCredentials = None
+
+try:
+    from google.oauth2.service_account import Credentials as GSCredentials
+    _has_sa = True
+except ImportError:
+    _has_sa = False
+
+try:
+    from google_auth_oauthlib.flow import InstalledAppFlow
+    from google.auth.transport.requests import Request
+    from google.oauth2.credentials import Credentials as OAuthCredentials
+    _has_oauth = True
+except ImportError:
+    _has_oauth = False
+
+TOKEN_FILE = PROJECT_ROOT / "data" / "oauth_token.json"
 
 # --- Helpers ---
 
@@ -39,11 +58,12 @@ def _is_enabled() -> bool:
     return os.getenv("GOOGLE_SHEETS_ENABLED", "false").strip().lower() == "true"
 
 def _get_credentials():
-    """Load service account credentials from the JSON file path.
+    """Load credentials from the JSON file path.
 
-    Returns gspread-compatible Credentials object or None if unavailable.
+    Supports both Service Account and OAuth2 installed app credentials.
+    Returns gspread-compatible Credentials object or None.
     """
-    if not _GS_AVAILABLE or _GSCredentials is None:
+    if not _GS_AVAILABLE:
         print("[Sheets Sync] gspread not installed — skipping sync")
         return None
 
@@ -57,13 +77,72 @@ def _get_credentials():
         return None
 
     try:
-        creds = _GSCredentials.from_service_account_file(
-            creds_path,
-            scopes=["https://www.googleapis.com/auth/spreadsheets"]
-        )
-        return creds
+        with open(creds_path) as f:
+            cred_data = json.load(f)
     except Exception as e:
-        print(f"[Sheets Sync] Failed to load credentials: {e} — skipping sync")
+        print(f"[Sheets Sync] Failed to read credentials: {e}")
+        return None
+
+    # Determine credential type
+    if "type" in cred_data and cred_data["type"] == "service_account":
+        # Service Account — no user interaction needed
+        if not _has_sa:
+            print("[Sheets Sync] google-auth not installed for Service Account — skipping sync")
+            return None
+        try:
+            creds = GSCredentials.from_service_account_file(
+                creds_path,
+                scopes=["https://www.googleapis.com/auth/spreadsheets"]
+            )
+            return creds
+        except Exception as e:
+            print(f"[Sheets Sync] Service Account auth failed: {e}")
+            return None
+
+    elif "installed" in cred_data:
+        # OAuth2 Installed App — needs browser flow once, then cached token
+        if not _has_oauth:
+            print("[Sheets Sync] google-auth-oauthlib not installed — skipping sync")
+            return None
+
+        scopes = ["https://www.googleapis.com/auth/spreadsheets"]
+
+        # Try to load cached token first
+        creds = None
+        if TOKEN_FILE.exists():
+            try:
+                token_data = json.loads(TOKEN_FILE.read_text())
+                creds = OAuthCredentials(token=token_data.get("access_token", ""))
+                # Check if token is still valid
+                if creds.expired and creds.refresh_token:
+                    creds.refresh(Request())
+                    # Save refreshed token
+                    TOKEN_FILE.write_text(json.dumps({
+                        "token": creds.token,
+                        "refresh_token": creds.refresh_token,
+                        "expiry": creds.expiry.isoformat() if hasattr(creds, 'expiry') else ""
+                    }))
+            except Exception:
+                creds = None
+
+        # If no valid cached token, run OAuth2 flow
+        if creds is None or not creds.valid:
+            print("[Sheets Sync] OAuth2 authentication required — opening browser...")
+            print("[Sheets Sync] After login, the token will be cached for future runs.")
+            flow = InstalledAppFlow.from_client_secrets_file(creds_path, scopes)
+            creds = flow.run_local_server(port=0)
+            # Save token for next time
+            TOKEN_FILE.write_text(json.dumps({
+                "token": creds.token,
+                "refresh_token": getattr(creds, 'refresh_token', ''),
+                "expiry": getattr(creds, 'expiry', {}).isoformat() if hasattr(creds, 'expiry') else ""
+            }))
+            print("[Sheets Sync] OAuth2 authentication successful. Token cached.")
+
+        return creds
+
+    else:
+        print("[Sheets Sync] Unknown credentials format — skipping sync")
         return None
 
 # --- Main sync function ---

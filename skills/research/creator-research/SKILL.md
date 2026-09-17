@@ -2,6 +2,8 @@
 name: creator-research
 description: Use for creator discovery, scraping, and CRM management.
 version: 1.0.0
+author: Hafizuddin
+license: MIT
 platforms: [macos]
 metadata:
   hermes:
@@ -13,7 +15,21 @@ metadata:
 
 A safety-first workflow for building and maintaining a research dataset of publicly available creator information.
 
-## Architecture
+## When to Use
+
+Load this skill when the user asks to discover or find new creators, scrape a platform (TikTok, Instagram, Facebook, LinkedIn, Reddit, Threads, YouTube, Vimeo, Civitai), refresh creator data, merge results into the Master CRM, or run any creator research workflow. Trigger on phrases like "find creators," "scrape TikTok," "refresh CRM data," or "run research pipeline."
+
+## Quick Reference
+
+| Tool | Description |
+|------|-------------|
+| `creator_scrape` | Scrape one public creator profile URL. Returns structured data. |
+| `creator_batch_scrape` | Rescrape creators from Master CRM. Supports platform filter and limit. Always creates backup. |
+| `creator_validate` | Validate Master CRM data quality (duplicates, schema, integrity). |
+
+## Procedure
+
+### Architecture
 
 ```
 Hermes Agent
@@ -28,7 +44,7 @@ creator_validate (plugin tool)
 data/Creator-Intel-CRM-List.csv (SINGLE SOURCE OF TRUTH)
 ```
 
-## Master CRM
+### Master CRM
 
 **File:** `data/Creator-Intel-CRM-List.csv`
 
@@ -38,55 +54,17 @@ data/Creator-Intel-CRM-List.csv (SINGLE SOURCE OF TRUTH)
 
 **Legacy file:** `data/input/input_channels.csv` is deprecated — do NOT use in active workflow.
 
-## Backup Rules
+### Backup Rules
 
 Every operation that modifies the Master CRM creates a backup first:
 - Location: `data/backups/Creator-Intel-CRM-List_YYYYMMDD_HHMMSS.csv`
 - If backup creation fails, the operation aborts
 - Backups are never overwritten (unique timestamps)
-- Previous backups are preserved
+- Previous backups preserved
 
-## Before Every Scrape
+### Discovery Workflow
 
-1. Record current CRM row count: `wc -l data/Creator-Intel-CRM-List.csv`
-2. Create backup: `python3 -c "from common import backup_crm; backup_crm()"`
-3. Verify backup exists before proceeding
-
-## Running Scrapers
-
-### Single Profile (Recommended)
-```bash
-source .venv/bin/activate
-python3 code/scraper/run.py --url "https://www.tiktok.com/@example" --limit 1
-```
-
-### Batch Scrape
-```bash
-source .venv/bin/activate
-python3 code/scraper/run.py --input data/input/civitai_input.csv
-```
-
-### Platform-Specific
-```bash
-source .venv/bin/activate
-python3 code/scraper/civitai.py --limit 5
-python3 code/scraper/reddit.py --limit 5
-```
-
-### Important: Do NOT call platform scrapers directly for CRM merges
-- Platform scrapers write to `data/output/<platform>_scraped_output.csv` — they do NOT merge to CRM
-- Only `run.py --url` and `run.py --input` handle CRM merge
-- `--platform` mode does NOT merge to CRM
-
-## After Scraping
-
-1. Verify CRM row count matches or increased — NEVER decreased
-2. Check output CSV for errors
-3. Update README.md row count
-
-## Discovery Workflow
-
-### Natural Language (Recommended)
+#### Natural Language (Recommended)
 
 1. User: "Find 10 AI TikTok creators"
 2. Hermes calls `web_search` with appropriate query
@@ -95,27 +73,88 @@ python3 code/scraper/reddit.py --limit 5
 5. Hermes calls `creator_scrape` for each new URL
 6. Hermes calls `creator_validate` to confirm data quality
 
-### Slash Command
+#### Slash Command
 ```
 /creator-discover platform:tiktok keywords:"AI video" count:10
 /creator-discover platform:instagram keywords:"AI art" count:5
 /creator-discover platform:youtube keywords:"machine learning" count:20
 ```
 
-## Plugin Tools
+### Before Every Scrape
 
-| Tool | Description |
-|------|-------------|
-| `creator_scrape` | Scrape one public creator profile URL. Returns structured data. |
-| `creator_batch_scrape` | Rescrape creators from Master CRM. Supports platform filter and limit. Always creates backup. |
-| `creator_validate` | Validate Master CRM data quality (duplicates, schema, integrity). |
+1. Record current CRM row count: `wc -l data/Creator-Intel-CRM-List.csv`
+2. Create backup: `python3 -c "from common import backup_crm; backup_crm()"`
+3. Verify backup exists before proceeding
 
-## CRM Merge Rules
+### Running Scrapers
+
+#### Single Profile (Recommended)
+```bash
+source .venv/bin/activate
+python3 code/scraper/run.py --url "https://www.tiktok.com/@example" --limit 1
+```
+
+#### Batch Scrape
+```bash
+source .venv/bin/activate
+python3 code/scraper/run.py --input data/input/civitai_input.csv
+```
+
+#### Platform-Specific
+```bash
+source .venv/bin/activate
+python3 code/scraper/civitai.py --limit 5
+python3 code/scraper/reddit.py --limit 5
+```
+
+#### Important: Do NOT call platform scrapers directly for CRM merges
+- Platform scrapers write to `data/output/<platform>_scraped_output.csv` — they do NOT merge to CRM
+- Only `run.py --url` and `run.py --input` handle CRM merge
+- `--platform` mode does NOT merge to CRM
+
+### After Scraping
+
+1. Verify CRM row count matches or increased — NEVER decreased
+2. Check output CSV for errors
+3. Update README.md row count
+
+### CRM Merge Rules
 
 - `merge_to_crm()` takes a single dict — updates existing or appends new
 - `merge_results_to_crm()` takes a DataFrame — batch merge
 - ProfileURL matching is case-insensitive + trailing-slash normalized
 - Never bypass these functions with manual CSV writes
+
+### Output Formatting (Every Scrape)
+
+1. **Follower normalization** — K/M/B notation (e.g. 4812 → 4.8K)
+2. **Bio cleanup** — strip platform UI chrome (Malay, cookie banners)
+3. **Locale** — en-US browser context for all Playwright scrapers
+4. **Link resolution** — decode redirect URLs to canonical profile URLs
+5. **EvidenceJSON** — must be valid RFC 8259 JSON
+
+## Verification
+
+Before declaring any step complete, confirm:
+
+- **Backup created:** Timestamped backup file exists at `data/backups/` before any CRM write
+- **CRM row count preserved or increased:** Re-read CRM from disk after merge; count must equal before_count + appended − deleted
+- **CRM row count never decreased:** If count drops below before_count, abort and restore from backup immediately
+- **No duplicates:** Search CRM for duplicate ProfileURLs after merge
+- **Schema intact:** Column count and order unchanged (19 columns, same sequence)
+- **EvidenceJSON valid:** Every EvidenceJSON field parses as RFC 8259 JSON (no Python dict syntax)
+- **ProfileURLs sanitized:** No tracking params (utm_*, fbclid, si, ref) in any ProfileURL
+- **Platform casing canonical:** All platform values match canonical casing (TikTok, Facebook, Instagram, LinkedIn, Reddit, Threads, YouTube, Vimeo, Civitai)
+- **README row count updated:** If CRM changed, README.md line reflects new count
+
+## Pitfalls
+
+- **Civitai followers**: API doesn't expose followers; fetch web page for `followerCountAllTime`
+- **Reddit blocks scraping**: Requires OAuth2; mark as `needs_manual_check`
+- **Facebook Malay UI**: Set browser to English before scraping
+- **Newlines in Notes**: Replace `\n` with spaces before CSV write
+- **Duplicate ProfileURLs**: Always dedupe case-insensitively
+- **Merge misalignment**: Ensure scraped CSV has `Name/Handle` (not `Handle`) and `ProfileURL` columns
 
 ## Data Safety Rules
 
@@ -125,6 +164,13 @@ python3 code/scraper/reddit.py --limit 5
 4. **Always deduplicate** — check ProfileURL before adding (case-insensitive)
 5. **Preserve existing valid data** — don't overwrite with empty/null/failed results
 6. **Report partial success** — "7/10 scraped successfully"
+
+## Backup Files
+
+- Location: `data/backups/Creator-Intel-CRM-List_YYYYMMDD_HHMMSS.csv`
+- Timestamped, never overwritten
+- Previous backups preserved
+- Verify backup exists after creation
 
 ## Example Prompts
 
@@ -144,30 +190,6 @@ python3 code/scraper/reddit.py --limit 5
 "Validate the CRM for duplicates"
 → creator_validate
 ```
-
-## Output Formatting (Every Scrape)
-
-1. **Follower normalization** — K/M/B notation (e.g. 4812 → 4.8K)
-2. **Bio cleanup** — strip platform UI chrome (Malay, cookie banners)
-3. **Locale** — en-US browser context for all Playwright scrapers
-4. **Link resolution** — decode redirect URLs to canonical profile URLs
-5. **EvidenceJSON** — must be valid RFC 8259 JSON
-
-## Pitfalls
-
-- **Civitai followers**: API doesn't expose followers; fetch web page for `followerCountAllTime`
-- **Reddit blocks scraping**: Requires OAuth2; mark as `needs_manual_check`
-- **Facebook Malay UI**: Set browser to English before scraping
-- **Newlines in Notes**: Replace `\n` with spaces before CSV write
-- **Duplicate ProfileURLs**: Always dedupe case-insensitively
-- **Merge misalignment**: Ensure scraped CSV has `Name/Handle` (not `Handle`) and `ProfileURL` columns
-
-## Backup Files
-
-- Location: `data/backups/Creator-Intel-CRM-List_YYYYMMDD_HHMMSS.csv`
-- Timestamped, never overwritten
-- Previous backups preserved
-- Verify backup exists after creation
 
 ## Related
 

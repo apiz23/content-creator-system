@@ -64,3 +64,4 @@ data/backups/
 data/output/*_2026-*.csv
 data/output/fb_batch*.csv
 data/output/batch_dispatch_output.csv
+obsidian/

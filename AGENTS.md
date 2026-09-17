@@ -1314,3 +1314,29 @@ These rules apply to all platform scrapers:
 - **Vimeo** (`code/scraper/vimeo.py`) — non-browser, yt-dlp based
 - **Civitai** (`code/scraper/civitai.py`) — non-browser, API based
 - **Batch dispatcher** (`code/scraper/run.py`, `code/scraper/scrape_all.py`) — uses `create_english_context()` for all Playwright sessions
+
+---
+
+# 20. GOOGLE SHEETS INTEGRATION (OPTIONAL)
+
+An optional Google Sheets sync step runs automatically after `merge_to_crm()` succeeds, configured entirely via `.env`.
+
+## Setup
+
+1. Enable Google Sheets API in Google Cloud Console
+2. Create a Service Account and download the JSON key file
+3. Share the target Google Sheet with the service account email address
+4. Set in `.env`:
+   - `GOOGLE_SHEETS_ENABLED=true`
+   - `GOOGLE_SHEETS_CREDENTIALS_PATH=/path/to/service-account.json`
+   - `GOOGLE_SHEET_ID=<spreadsheet-id>`
+   - `GOOGLE_SHEET_TAB=CRM`
+
+## Behavior
+
+- After every successful CRM merge, `sync_crm_to_sheet()` is called with the newly merged/updated rows only
+- If credentials are missing, invalid, or the API call errors out: logged and skipped — **never blocks the scrape**
+- Only fully validated CRM rows are synced (pending_review records are excluded)
+- Module: `code/scraper/sheets_sync.py`
+- Library: `gspread` + `google-auth` (added to `requirements.txt`)
+

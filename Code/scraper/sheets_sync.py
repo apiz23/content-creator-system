@@ -16,6 +16,7 @@ import os
 import sys
 import json
 from pathlib import Path
+from datetime import datetime, timezone
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from common import PROJECT_ROOT
@@ -112,7 +113,19 @@ def _get_credentials():
         if TOKEN_FILE.exists():
             try:
                 token_data = json.loads(TOKEN_FILE.read_text())
-                creds = OAuthCredentials(token=token_data.get("access_token", ""))
+                # Parse expiry string back to datetime
+                expiry_str = token_data.get("expiry", "")
+                expiry_dt = None
+                if expiry_str:
+                    try:
+                        expiry_dt = datetime.fromisoformat(expiry_str)
+                    except (ValueError, TypeError):
+                        pass
+                creds = OAuthCredentials(
+                    token=token_data.get("token", ""),
+                    refresh_token=token_data.get("refresh_token", ""),
+                    expiry=expiry_dt
+                )
                 # Check if token is still valid
                 if creds.expired and creds.refresh_token:
                     creds.refresh(Request())
@@ -120,7 +133,7 @@ def _get_credentials():
                     TOKEN_FILE.write_text(json.dumps({
                         "token": creds.token,
                         "refresh_token": creds.refresh_token,
-                        "expiry": creds.expiry.isoformat() if hasattr(creds, 'expiry') else ""
+                        "expiry": creds.expiry.isoformat() if hasattr(creds, 'expiry') and creds.expiry else ""
                     }))
             except Exception:
                 creds = None

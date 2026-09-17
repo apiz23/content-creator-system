@@ -240,6 +240,15 @@ def merge_to_crm(result_dict, crm_path=None):
     verify_count = len(df_verify)
     assert verify_count == after_count, f"Verification failed: wrote {after_count}, re-read {verify_count}"
 
+    # Google Sheets sync (optional, non-blocking)
+    try:
+        from sheets_sync import sync_crm_to_sheet
+        sync_result = sync_crm_to_sheet([result_dict])
+        if sync_result.get("synced", 0) > 0 or sync_result.get("errors", 0) > 0:
+            print(f"[Sheets Sync] {sync_result['message']}")
+    except Exception as e:
+        print(f"[Sheets Sync] Not available or error: {e}")
+
     return (before_count, after_count, action)
 
 def backup_crm(crm_path=None):
@@ -316,6 +325,17 @@ def merge_results_to_crm(results_df, crm_path=None):
                 skipped += 1
 
     after_count = len(pd.read_csv(crm_path)) if Path(crm_path).exists() else 0
+
+    # Google Sheets sync for batch results (optional, non-blocking)
+    try:
+        from sheets_sync import sync_crm_to_sheet
+        merged_rows = results_df.to_dict('records')
+        sync_result = sync_crm_to_sheet(merged_rows)
+        if sync_result.get("synced", 0) > 0 or sync_result.get("errors", 0) > 0:
+            print(f"[Sheets Sync] {sync_result['message']}")
+    except Exception as e:
+        print(f"[Sheets Sync] Not available or error: {e}")
+
     return {
         "before_count": before_count,
         "after_count": after_count,

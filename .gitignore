@@ -46,10 +46,10 @@ Thumbs.db
 *.log
 logs/
 
-# Data - raw data directories preserved, but ignore temp/output artifacts if desired
-# Uncomment if you want to ignore output CSVs:
-# data/output/
-# data/input/*.csv
+# Data - raw data directories preserved, but ignore temp/output artifacts
+data/output/
+data/input/*.csv
+data/pending_review.csv
 
 # Obsidian - ignore if not versioned
 obsidian/

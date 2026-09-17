@@ -208,7 +208,7 @@ No additional configuration is required. The plugin resolves paths relative to i
 - **`AGENTS.md`** — Full agent workflow rules (17 sections covering data safety, normalization, scraping, Obsidian sync, cron jobs, and CRM Data Quality Gate)
 - **`code/scraper/run.py`** — Unified dispatcher: `python3 code/scraper/run.py --url <profile-url> --limit 1`
 - **`code/scraper/common.py`** — Shared utilities including `merge_to_crm()`, `load_and_clean_csv()`, `detect_platform_from_url()`, `extract_email()`
-- **`data/Creator-Intel-CRM-List.csv`** — Master CRM (1053 rows as of Sep 14 2026)
+- **`data/Creator-Intel-CRM-List.csv`** — Master CRM (1114 rows as of 2026-09-17, 90 Facebook profiles)
 - **`data/input/input_channels.csv`** — Persistent scraping queue (1001 rows)
 
 ## Scraper Usage

@@ -13,7 +13,8 @@ from model_client import call_model
 from common import (
     PROJECT_ROOT, INPUT_CSV_FILE, TARGET_COLUMNS,
     load_and_clean_csv, get_column_names, enforce_target_columns,
-    merge_scraped_row, extract_email, filter_platform_rows
+    merge_scraped_row, extract_email, filter_platform_rows,
+    create_english_context, clean_platform_ui_text, normalize_follower_to_kmb, resolve_final_url
 )
 
 # --- CONFIGURATION ---
@@ -149,10 +150,7 @@ def main(limit=None, model_provider=None, model_name=None):
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
-        context = browser.new_context(
-            user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-            viewport={"width": 1280, "height": 800}
-        )
+        context = create_english_context(browser)
         page = context.new_page()
 
         for idx, (original_index, row) in enumerate(tiktok_rows.iterrows(), 1):

@@ -5,7 +5,7 @@ import time
 import requests
 import pandas as pd
 from datetime import datetime
-from urllib.parse import unquote
+from urllib.parse import unquote, urlparse, parse_qs, quote
 from playwright.sync_api import sync_playwright
 from pathlib import Path
 import argparse
@@ -19,6 +19,137 @@ from common import (
 
 # --- CONFIGURATION ---
 OUTPUT_CSV_FILE = PROJECT_ROOT / "data/output/facebook_scraped_output.csv"
+
+# Malay/Indonesian Facebook UI chrome tokens to strip from bio text
+FACEBOOK_UI_TOKENS = [
+    r'\bLagi\b', r'\bSiaran\b', r'\bPerihal\b', r'\bReels\b',
+    r'\bFoto\b', r'\bPengenalan\b', r'\bmengikuti\b', r'\bpengikut\b',
+    r'\bRakan\b', r'\bPekerjaan\b', r'\btempat ker\b', r'\bTiada\b',
+    r'\bFoto\b', r'\bVideo\b', r'\bSiaran\b', r'\bPasar\b',
+]
+
+# Malay number suffixes: J = juta = million, K = ribu = thousand
+MALAY_NUMBER_MAP = {
+    'J': 'M',   # juta → million
+    'k': 'K',   # ribu → thousand (already K but normalize)
+}
+
+# Clean Facebook UI pattern for notes
+FB_UI_PATTERN = re.compile(
+    r'\s*(?:Lagi|Siaran|Perihal|Reels|Foto|Pengenalan|mengikuti|pengikut|'
+    r'Rakan|Pekerjaan|tempat ker|Tiada|Video|Pasar)\s*',
+    re.IGNORECASE
+)
+
+# Double-wrapped URL detection (URL nested inside another URL param)
+DOUBLE_WRAP_PATTERN = re.compile(r'https?://.*?(https?://[^\s"\'<>]+)')
+
+
+def normalize_follower_count(raw: str) -> tuple:
+    """Normalize locale-specific follower strings to standard K/M/B notation.
+
+    Returns (normalized_string, raw_locale_string_for_evidence).
+    - "1.2K pengikut" → ("1.2K", "1.2K pengikut")
+    - "1.1J pengikut" → ("1.1M", "1.1J pengikut")
+    - "1,108,428" → ("1.1M", "1,108,428")
+    - "559K" → ("559K", "559K")
+    """
+    raw = raw.strip()
+    raw_locale = raw  # preserve original for traceability
+
+    # Strip Malay labels like "pengikut", "mengikuti" from the count string
+    count_str = re.sub(r'\s*(?:pengikut|mengikuti|pengikut|men\s*ikut)\s*$', '', raw, flags=re.IGNORECASE).strip()
+
+    # Handle Malay "J" (juta = million) suffix → convert to "M"
+    count_str = re.sub(r'([\d.,]+)\s*J\b', r'\1M', count_str, flags=re.IGNORECASE)
+
+    # Extract just the numeric part (e.g., "1.2K", "1.1M", "559K")
+    num_match = re.search(r'([\d.,]+)\s*([KkMmBb]?)', count_str)
+    if num_match:
+        number = num_match.group(1).replace(',', '')
+        suffix = num_match.group(2).upper() if num_match.group(2) else ''
+        # If we have a number and a suffix, reconstruct
+        try:
+            val = float(number)
+            if suffix == 'K':
+                if val >= 1000:
+                    normalized = f"{val/1000:.1f}M".rstrip('0').rstrip('.') + 'M'
+                else:
+                    normalized = f"{val:g}K"
+            elif suffix == 'M':
+                if val >= 1000:
+                    normalized = f"{val/1000000:.1f}B".rstrip('0').rstrip('.') + 'B'
+                else:
+                    normalized = f"{val:g}M"
+            elif suffix == 'B':
+                normalized = f"{val:g}B"
+            else:
+                # No suffix but large number — auto-convert
+                if val >= 1_000_000:
+                    normalized = f"{val/1_000_000:.1f}M".rstrip('0').rstrip('.')
+                elif val >= 1_000:
+                    normalized = f"{val/1_000:.1f}K".rstrip('0').rstrip('.')
+                else:
+                    normalized = f"{val:,.0f}"
+        except ValueError:
+            normalized = count_str
+    else:
+        normalized = count_str
+
+    return normalized, raw_locale
+
+
+def clean_bio_preview(bio: str) -> str:
+    """Strip Facebook Malay UI chrome tokens and collapse to single clean line.
+
+    Removes tokens like 'Lagi', 'Siaran', 'Perihal', 'Reels', 'Foto', 'Pengenalan'
+    and collapses whitespace/newlines into a single trimmed line.
+    """
+    if not bio:
+        return ""
+    cleaned = bio
+    for token in FACEBOOK_UI_TOKENS:
+        cleaned = re.sub(token, ' ', cleaned)
+    # Collapse whitespace/newlines to single space, trim
+    cleaned = re.sub(r'\s+', ' ', cleaned).strip()
+    return cleaned
+
+
+def normalize_external_link(url: str) -> str:
+    """Decode and extract the real target URL from double-wrapped strings.
+
+    e.g. 'https://www.instagram.com/https%3A%2F%2Fwww.instagram.com%2Fhandle%2F'
+    → 'https://www.instagram.com/handle/'
+    """
+    if not url:
+        return ""
+    # Try to decode URL-encoded nested URL
+    decoded = unquote(url)
+    # Check if decoded contains a nested URL
+    match = DOUBLE_WRAP_PATTERN.search(decoded)
+    if match and match.group(1) != decoded[:match.start()]:
+        return match.group(1)
+    # Check the original URL too
+    match = DOUBLE_WRAP_PATTERN.search(url)
+    if match:
+        return match.group(1)
+    return url
+
+
+def create_facebook_context(browser):
+    """Create a browser context forced to English (en-US) locale.
+
+    Sets Accept-Language header via extra_http_headers and locale
+    to prevent Malay/Indonesian UI text.
+    """
+    return browser.new_context(
+        user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        locale="en-US",
+        viewport={"width": 1280, "height": 800},
+        extra_http_headers={
+            "Accept-Language": "en-US,en;q=0.9",
+        }
+    )
 
 
 def classify_with_local_llm(bio: str, handle: str, model_provider=None, model_name=None):
@@ -87,20 +218,23 @@ def scrape_facebook_profile(page, profile_url: str, model_provider=None, model_n
         og_title = page.locator('meta[property="og:title"]').get_attribute("content") or ""
         og_desc = page.locator('meta[property="og:description"]').get_attribute("content") or ""
         
-        # 2. Extract Followers / Likes
-        follower_count = "N/A"
+        # 2. Extract Followers / Likes (normalize to English K/M/B notation)
+        follower_count_raw = "N/A"
         # Often in og:description: "X likes · Y talking about this" or "X followers"
-        fol_match = re.search(r'([\d\.,]+[KkMmBb]?)\s*(?:followers|likes)', og_desc, re.IGNORECASE)
+        fol_match = re.search(r'([\d\.,]+[KkMmBbJj]?)\s*(?:followers|likes|pengikut|mengikuti)', og_desc, re.IGNORECASE)
         if fol_match:
-            follower_count = fol_match.group(1)
+            follower_count_raw = fol_match.group(1)
         else:
             # Try searching page text
             body_text = page.inner_text("body")
-            fol_match_body = re.search(r'([\d\.,]+[KkMmBb]?)\s*followers', body_text, re.IGNORECASE)
+            fol_match_body = re.search(r'([\d\.,]+[KkMmBbJj]?)\s*followers', body_text, re.IGNORECASE)
             if fol_match_body:
-                follower_count = fol_match_body.group(1)
+                follower_count_raw = fol_match_body.group(1)
 
-        # 3. Extract Bio / Intro
+        # Normalize follower count to standard K/M/B notation
+        follower_count, raw_locale_str = normalize_follower_count(follower_count_raw)
+
+        # 3. Extract Bio / Intro (clean Malay UI chrome tokens)
         bio = og_desc
         try:
             intro_elem = page.locator('div[role="main"]').inner_text()
@@ -108,18 +242,20 @@ def scrape_facebook_profile(page, profile_url: str, model_provider=None, model_n
                 bio = intro_elem[:300]
         except Exception:
             pass
+        # Clean bio preview: strip Malay UI tokens, collapse to single line
+        bio_clean = clean_bio_preview(bio)
 
-        # 4. Extract External Link
+        # 4. Extract External Link (decode double-wrapped URLs)
         external_link = ""
         try:
             links = page.locator('a[href*="http"]').all()
             for l in links:
                 href = l.get_attribute("href") or ""
                 if "l.facebook.com" in href:
-                    external_link = clean_facebook_url(href)
+                    external_link = normalize_external_link(clean_facebook_url(href))
                     break
                 elif not any(d in href for d in ["facebook.com", "fb.com", "instagram.com"]):
-                    external_link = href
+                    external_link = normalize_external_link(href)
                     break
         except Exception:
             pass
@@ -132,10 +268,11 @@ def scrape_facebook_profile(page, profile_url: str, model_provider=None, model_n
             "platform": "Facebook",
             "handle": handle,
             "title": og_title,
-            "bio_preview": bio[:100],
+            "bio_preview": bio_clean[:100],
             "external_link": external_link,
             "aigc_verdict": ai_meta.get("AIGCVerdict", "yes"),
-            "ai_reasoning": ai_meta.get("Evidence", "")
+            "ai_reasoning": ai_meta.get("Evidence", ""),
+            "follower_raw_locale": raw_locale_str
         }
 
         return {
@@ -148,7 +285,7 @@ def scrape_facebook_profile(page, profile_url: str, model_provider=None, model_n
             "PrimaryAITool": ai_meta.get("PrimaryAITool"),
             "SampleContentURL": external_link or profile_url,
             "AIGCVerdict": ai_meta.get("AIGCVerdict", "yes"),
-            "Notes": f"Facebook scrape: followers={follower_count}; bio_preview={bio[:60].strip()}",
+            "Notes": f"Facebook scrape: followers={follower_count}; bio_preview={bio_clean[:60].strip()}",
             "FeedURL": profile_url,
             "ContactSourceURL": profile_url if email != "not exposed" else external_link,
             "EvidenceJSON": json.dumps(evidence)
@@ -183,10 +320,7 @@ def main(limit=None, model_provider=None, model_name=None):
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
-        context = browser.new_context(
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-            viewport={"width": 1280, "height": 800}
-        )
+        context = create_facebook_context(browser)
         page = context.new_page()
 
         for idx, (original_index, row) in enumerate(fb_rows.iterrows(), 1):

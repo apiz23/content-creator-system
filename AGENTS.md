@@ -1056,6 +1056,16 @@ Before editing a file:
 
 Do not delete or replace files without a clear reason. Do not create unnecessary duplicate files. Use descriptive filenames.
 
+## Python File Creation & Hygiene
+
+Before creating any new `.py` file, check whether existing functionality can be reused or extended. Do not create a new Python file merely because an existing file is large — only split functionality into a new file when it represents a genuinely separate responsibility or improves maintainability.
+
+For temporary debugging, verification, testing, or one-off work, treat the file as scratch work and delete it immediately after the task that required it is complete. Scratch-file naming patterns: `test.py`, `test_*.py`, `debug.py`, `debug_*.py`, `check.py`, `check_*.py`, `verify.py`, `verify_*.py`, `temp.py`, `temp_*.py`, `*_test.py`, and other one-off scripts. Never leave these in the project root or production directories unless they are intentionally part of the project.
+
+Before deleting any Python file, inspect its references/usages if there is any uncertainty about whether it is important. Never delete a potentially important Python file solely because its name looks temporary.
+
+Do not create new Python files during cleanup unless absolutely necessary.
+
 ---
 
 The overall objective is to produce creator intelligence that is:
@@ -1228,3 +1238,79 @@ Do not "fix" uncertain information by guessing.
 ## 18.4 Cron Execution
 
 For cron execution, the same rules apply to every run. Each scheduled run must independently validate every record through the full Data Quality Gate before any merge_to_crm() call.
+
+---
+
+# 19. OUTPUT FORMATTING STANDARD
+
+All platform scrapers must enforce these formatting rules **before any row is merged into the CRM**, regardless of platform. These rules are mandatory for every scrape, discovery, and merge operation.
+
+## 19.1 Follower Count Normalization
+
+- Always normalize to English **K/M/B notation** regardless of platform locale.
+  - `"1.1J"` (Malay: juta = million) → `"1.1M"`
+  - `"pengikut"` / `"mengikuti"` labels → stripped/ignored
+  - Plain numbers → auto-convert (e.g., `26,737` → `"26.7K"`, `1,108,428` → `"1.1M"`)
+- **Never** write a locale-specific number or label directly into the `FollowerCount` column.
+- **Raw/original value** goes into `EvidenceJSON.follower_raw_locale` for traceability only.
+
+Use the shared helper: `normalize_follower_to_kmb(raw)` from `code/scraper/common.py`.
+
+## 19.2 Bio/Preview Text Cleanup
+
+- Strip **platform UI chrome** from bio/preview text for **every platform**, not just Facebook:
+  - Malay/Indonesian tokens: `Lagi`, `Siaran`, `Perihal`, `Reels`, `Foto`, `Pengenalan`, `mengikuti`, `pengikut`
+  - Multi-language nav tabs: `More`, `See More`, `Ver más`, `En savoir plus`, `Meer lezen`, `Voir plus`
+  - Cookie/consent banners: `Cookie`, `Accept`, `Consent`
+- Always produce a **single clean snippet/sentence** — no multi-line menu fragments.
+- Collapse whitespace/newlines to a single trimmed line using `clean_platform_ui_text(text)`.
+- Store the cleaned version in `bio_preview` and `Notes`; the raw original goes into `EvidenceJSON` only.
+
+Use the shared helper: `clean_platform_ui_text(text)` from `code/scraper/common.py`.
+
+## 19.3 Locale Consistency
+
+- **Force English (en-US) locale** + `Accept-Language: en-US,en;q=0.9` on **every** Playwright browser session, for **every platform** scraper.
+- This prevents scraped UI text from being returned in another language (Malay, Indonesian, Spanish, French, etc.).
+- Use the shared helper: `create_english_context(browser)` from `code/scraper/common.py`.
+- Non-browser scrapers (YouTube via yt-dlp, Vimeo via yt-dlp, Civitai via API) are not affected by browser locale but must still normalize follower counts and clean bio text.
+
+## 19.4 Link Resolution
+
+- Always resolve `external_link` / `SampleContentURL` to the **final real URL**.
+- Decode any **URL-encoded/double-wrapped links** before saving.
+  - e.g. `https://www.instagram.com/https%3A%2F%2Fwww.instagram.com%2Fhandle%2F` → `https://www.instagram.com/handle/`
+  - e.g. Facebook redirect `l.facebook.com/l.php?u=...` → decoded target URL
+- Use the shared helper: `resolve_final_url(url)` from `code/scraper/common.py`.
+
+## 19.5 Record Completeness Gate
+
+- **Never** merge a "discovery-only" or partially-scraped record (missing `follower_count` AND `bio_preview`) into the main CRM, **regardless of platform**.
+- Route incomplete records to a separate **pending-review queue** (`data/pending_review.csv`) instead.
+- This is enforced by `is_discovery_only()` and `route_to_pending_review()` in `code/scraper/common.py`, called automatically by `merge_to_crm()`.
+- The pending-review queue is for manual review — these records must NOT pollute the Master CRM.
+
+## 19.6 Validation on Every Merge
+
+- Run the existing **Data Quality Gate** (AGENTS.md Sections 17-18) on **every** `merge_to_crm()` call, no exceptions per platform:
+  - Schema: 19 columns, exact column count
+  - Normalization: K/M/B follower format, clean bio text
+  - Dedup: case-insensitive ProfileURL match
+  - EvidenceJSON: valid RFC 8259 JSON
+  - CSV encoding: UTF-8, no BOM, no embedded newlines
+  - No Malay/foreign UI contamination in Notes
+- On failure: `REJECT → LOG REASON → SKIP RECORD → CONTINUE`.
+
+## 19.7 Cross-Platform Application
+
+These rules apply to all platform scrapers:
+- **TikTok** (`code/scraper/tiktok.py`)
+- **Instagram** (`code/scraper/instagram.py`)
+- **Facebook** (`code/scraper/facebook.py`)
+- **LinkedIn** (`code/scraper/linkedin.py`)
+- **Reddit** (`code/scraper/reddit.py`)
+- **Threads** (`code/scraper/threads.py`)
+- **YouTube** (`code/scraper/main.py`) — non-browser, yt-dlp based
+- **Vimeo** (`code/scraper/vimeo.py`) — non-browser, yt-dlp based
+- **Civitai** (`code/scraper/civitai.py`) — non-browser, API based
+- **Batch dispatcher** (`code/scraper/run.py`, `code/scraper/scrape_all.py`) — uses `create_english_context()` for all Playwright sessions

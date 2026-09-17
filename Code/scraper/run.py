@@ -183,14 +183,12 @@ def run_batch(input_csv, limit=None, model_provider=None, model_name=None):
     
     if needs_browser:
         from playwright.sync_api import sync_playwright
+        from facebook import create_facebook_context
         
         print("[+] Launching browser for browser-based scrapers...")
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
-            context = browser.new_context(
-                user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-                viewport={"width": 1280, "height": 800}
-            )
+            context = create_facebook_context(browser)
             page = context.new_page()
             
             for platform in sorted(platform_rows.keys()):
@@ -268,7 +266,7 @@ def run_batch(input_csv, limit=None, model_provider=None, model_name=None):
         before_count = len(pd.read_csv(PROJECT_ROOT / "data" / "Creator-Intel-CRM-List.csv")) if (PROJECT_ROOT / "data" / "Creator-Intel-CRM-List.csv").exists() else 0
         crm_stats = merge_results_to_crm(successful_results)
         print(f"    CRM: {crm_stats['before_count']} → {crm_stats['after_count']} rows")
-        print(f"    Updated: {crm_stats['updated']}, Appended: {crm_stats['appended']}, Skipped: {crm_stats['skipped']}")
+        print(f"    Updated: {crm_stats['updated']}, Appended: {crm_stats['appended']}, Skipped: {crm_stats['skipped']}, Pending Review: {crm_stats['pending_review']}")
 
 
 def main():
@@ -377,8 +375,10 @@ Examples:
         page = None
         browser = None
         if needs_browser:
+            from facebook import create_facebook_context
             browser = sync_playwright().start().chromium.launch(headless=True)
-            page = browser.new_page()
+            context = create_facebook_context(browser)
+            page = context.new_page()
             page.goto(args.url)
             page.wait_for_load_state("domcontentloaded")
             import time

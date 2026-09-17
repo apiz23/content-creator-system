@@ -1330,7 +1330,7 @@ An optional Google Sheets sync step runs automatically after `merge_to_crm()` su
    - `GOOGLE_SHEETS_ENABLED=true`
    - `GOOGLE_SHEETS_CREDENTIALS_PATH=/path/to/service-account.json`
    - `GOOGLE_SHEET_ID=<spreadsheet-id>`
-   - `GOOGLE_SHEET_TAB=CRM`
+   - `GOOGLE_SHEET_TAB=Temp`
 
 ## Behavior
 

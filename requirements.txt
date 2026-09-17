@@ -3,6 +3,3 @@ playwright
 pandas
 requests
 yt-dlp
-gspread
-google-auth
-google-auth-oauthlib

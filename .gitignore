@@ -51,9 +51,6 @@ data/output/
 data/input/*.csv
 data/pending_review.csv
 
-# Obsidian - ignore if not versioned
-obsidian/
-
 # Code scrapers
 code/scraper/__pycache__/
 
@@ -67,6 +64,3 @@ data/backups/
 data/output/*_2026-*.csv
 data/output/fb_batch*.csv
 data/output/batch_dispatch_output.csv
-data/oauth_credentials.json
-data/oauth_token.json
-.DS_Store

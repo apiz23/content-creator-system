@@ -153,15 +153,6 @@ python3 code/scraper/reddit.py --limit 5
 4. **Link resolution** — decode redirect URLs to canonical profile URLs
 5. **EvidenceJSON** — must be valid RFC 8259 JSON
 
-## Google Sheets Sync (Optional)
-
-After successful CRM merge, `sync_crm_to_sheet()` pushes to Google Sheets if `GOOGLE_SHEETS_ENABLED=true`.
-
-- Tab name: `Temp` (never change without explicit instruction)
-- Auth: OAuth2 or Service Account
-- Fails gracefully if credentials missing
-- Rate limit (429) → wait 60s and retry
-
 ## Pitfalls
 
 - **Civitai followers**: API doesn't expose followers; fetch web page for `followerCountAllTime`

@@ -19,7 +19,7 @@ The primary focus is creators related to:
 - Developer Tools
 - Content Creation
 
-The project uses Hermes as the AI agent, DeepSeek as the primary reasoning/coding model, Python for scraping and data processing, and Obsidian as the knowledge base.
+The project uses Hermes as the AI agent, DeepSeek as the primary reasoning/coding model, and Python for scraping and data processing.
 
 ---
 
@@ -73,7 +73,6 @@ Only combine them when the user explicitly asks for both.
 | `data/Creator-Intel-CRM-List.csv` | Master CRM database | ❌ Never |
 | `data/output/*_scraped_output.csv` | Latest scraper output | ✅ Can refresh |
 | `data/output/creator_discovery.csv` | Optional discovery report | ✅ Can refresh |
-| `obsidian/Creator Research/` | Knowledge base | ❌ Preserve existing research |
 
 ## 2.1 input_channels.csv
 
@@ -124,13 +123,11 @@ VERIFY CREATOR
     ↓
 VERIFY PROFILE URL
     ↓
-CHECK FOR DUPLICATE (input CSV + Master CRM + Obsidian)
+CHECK FOR DUPLICATE (input CSV + Master CRM)
     ↓
 APPEND TO data/input/input_channels.csv
     ↓
 APPEND/UPDATE data/Creator-Intel-CRM-List.csv
-    ↓
-CREATE/UPDATE Obsidian CREATOR NOTE
     ↓
 UPDATE PLATFORM NOTE
     ↓
@@ -159,7 +156,7 @@ Do NOT automatically discover during a normal scrape.
 ## 3.1.1 Search vs Discovery
 
 - "search for creators" or "search for new creators" → triggers discovery (web search for new creators)
-- "search" alone (without "for creators") → search EXISTING records in input CSV / CRM / Obsidian for a specific creator. Does NOT trigger discovery.
+- "search" alone (without "for creators") → search EXISTING records in input CSV / CRM for a specific creator. Does NOT trigger discovery.
 - If the user says just "search" without specifying existing vs new, default to DISCOVERING new creators (treat as "search for new creators").
 - "scrape" → runs the scraper on existing input queue. Does NOT trigger discovery.
 
@@ -195,7 +192,6 @@ If the creator already exists:
 
 - Do not add another CSV row
 - Do not add another CRM row
-- Update existing Obsidian information if appropriate
 - Update existing CRM information if appropriate
 - Report that the creator already existed
 
@@ -225,22 +221,7 @@ When a creator is discovered and verified:
 6. Preserve existing useful information
 7. Never fabricate missing values
 
-## 3.7 Discovery → Obsidian
-
-After discovering a creator, IF the Obsidian vault exists at `obsidian/Creator Research/`:
-
-- Create/update `obsidian/Creator Research/Creators/<handle>.md`
-- Create/update `obsidian/Creator Research/Platforms/<Platform>.md`
-- Create/update `obsidian/Creator Research/Daily/YYYY-MM-DD.md`
-- Check relevant Projects and Research if applicable
-
-If Obsidian vault does not exist, skip Obsidian sync and continue with CSV/CRM updates only.
-
-Clearly distinguish DISCOVERED information from SCRAPED information.
-
-Do NOT present discovered information as scraped information.
-
-## 3.8 Discovery Completion
+## 3.7 Discovery Completion
 
 Do not say discovery is complete until:
 
@@ -249,14 +230,13 @@ Do not say discovery is complete until:
 - [ ] Duplicate check completed
 - [ ] Input CSV updated
 - [ ] Master Creator CRM updated
-- [ ] Creator Obsidian note created/updated
 - [ ] Platform note updated
 - [ ] Daily log updated
 - [ ] Relevant Project checked
 - [ ] Relevant Research checked
 - [ ] Changes verified
 
-## 3.9 Discovery Example
+## 3.8 Discovery Example
 
 User: "Find 1 TikTok creator who makes AI content."
 
@@ -276,8 +256,6 @@ Check Master CRM
 Append to input_channels.csv
     ↓
 Append to Creator-Intel-CRM-List.csv
-    ↓
-Create/update Creator note
     ↓
 Update TikTok platform note
     ↓
@@ -300,7 +278,6 @@ Discovery complete.
 - Profile: verified
 - Added to: data/input/input_channels.csv
 - Added to: data/Creator-Intel-CRM-List.csv
-- Creator note: created/updated
 - Platform note: Platforms/TikTok.md updated
 - Daily log: Daily/2026-09-01.md updated
 - Scraping: NOT performed
@@ -324,8 +301,6 @@ SAVE CSV TO data/output/
 VERIFY CSV
     ↓
 UPDATE MASTER CRM
-    ↓
-SYNC CREATOR NOTES
     ↓
 SYNC PLATFORM NOTE
     ↓
@@ -365,7 +340,7 @@ Each scraper is a standalone Python script run with `python3 <file>` from the re
 
 **`code/scraper/run.py`** is the unified dispatcher. It supports three modes: `--platform`, `--url`, and `--input` (full-CSV batch). After dispatching each profile, `run.py` automatically merges results into `data/Creator-Intel-CRM-List.csv` using the safe-write procedure (read → check duplicate by ProfileURL → update or append → validate → write → re-read to verify). `run.py` also writes intermediate results to `data/output/run_dispatch_output.csv` (URL mode) or `data/output/batch_dispatch_output.csv` (batch mode).
 
-|| Platform | Script | Input | Output | Preconditions | Delay |
+| Platform | Script | Input | Output | Preconditions | Delay |
 |---|---|---|---|---|---|
 | **Civitai** | `code/scraper/civitai.py` | `data/input/input_channels.csv` | `data/output/civitai_scraped_output.csv` | No browser needed. Public API. Requires `requests`, `pandas`. | 1s |
 | **Facebook** | `code/scraper/facebook.py` | `data/input/input_channels.csv` | `data/output/facebook_scraped_output.csv` | Playwright + Chromium installed. Requires `playwright`, `requests`, `pandas`. | 2s |
@@ -429,9 +404,8 @@ Before running any scraper:
 
 After scraping completes:
 1. **Verify output CSV**: Check `data/output/<platform>_scraped_output.csv` exists and has the expected row count.
-2. **Sync to CRM**: Run `code/scraper/sync_tiktok_crm.py` (or the equivalent sync script for the platform) to merge output into `data/Creator-Intel-CRM-List.csv` and sync Obsidian notes.
-3. **Update Obsidian**: Sync creator notes, platform notes, and daily log.
-4. **Report counts**: Successful records, failed records, new vs. updated in CRM.
+2. **Sync to CRM**: Run `code/scraper/sync_tiktok_crm.py` (or the equivalent sync script for the platform) to merge output into `data/Creator-Intel-CRM-List.csv`.
+3. **Report counts**: Successful records, failed records, new vs. updated in CRM.
 
 Note: `scrape_all.py` is the all-in-one runner that handles all platforms sequentially. It supports Civitai, YouTube, Vimeo, Threads, TikTok, Instagram, Facebook, LinkedIn, and Reddit in a single pass. Use it for "scrape all platforms" requests.
 
@@ -466,56 +440,7 @@ For every creator in the output:
 5. Never blank existing fields because scraper returned empty
 6. Never replace verified data with Unknown
 
-## 4.6 Scrape → Obsidian Sync
-
-After EVERY successful scraping run, IF the Obsidian vault exists at `obsidian/Creator Research/`:
-
-### Creator Notes (`obsidian/Creator Research/Creators/`)
-
-For EVERY successfully scraped creator:
-
-1. Search for an existing note
-2. If exists → UPDATE it
-3. If not exists → CREATE it
-4. Never create duplicate notes
-5. Preserve existing verified information
-6. Record source/evidence URLs
-7. Record scrape/update date
-
-### Platform Note (`obsidian/Creator Research/Platforms/`)
-
-Update the platform note with:
-
-- Platform name
-- Latest scrape date
-- Number of profiles processed
-- Number successfully scraped
-- Number failed
-- Relevant creator links (using wikilinks)
-- Scraping limitations
-- Important findings
-
-### Daily Log (`obsidian/Creator Research/Daily/`)
-
-Create/update `Daily/YYYY-MM-DD.md` with:
-
-- Date
-- Platform scraped
-- Input/output files
-- Records processed, succeeded, failed
-- New creators / existing creators updated
-- Obsidian notes created/updated
-- Errors encountered
-
-### Projects and Research
-
-- Update Projects only when associated with an existing project
-- Update Research only when scrape produces meaningful research findings
-- Do NOT create unnecessary project notes
-
-**If Obsidian vault does not exist**, skip all Obsidian sync steps and continue with CRM update only.
-
-## 4.7 Scrape Completion
+## 4.6 Scrape Completion
 
 The word "complete" MUST NOT be used until:
 
@@ -523,7 +448,6 @@ The word "complete" MUST NOT be used until:
 - [ ] CSV saved to `data/output/`
 - [ ] CSV verified
 - [ ] Master Creator CRM updated
-- [ ] Creator notes synchronized
 - [ ] Platform note synchronized
 - [ ] Daily log synchronized
 - [ ] Relevant Project notes checked
@@ -531,7 +455,7 @@ The word "complete" MUST NOT be used until:
 
 If any step fails, report exactly what failed and continue fixing it where possible.
 
-## 4.8 Scrape Report
+## 4.7 Scrape Report
 
 After every scraper execution, report:
 
@@ -542,11 +466,10 @@ After every scraper execution, report:
 - Records found in input
 - Records successfully scraped
 - Records failed
-- Obsidian notes created/updated
 - Daily log created/updated
 - Overall status: `SUCCESS`, `PARTIALLY COMPLETED`, or `FAILED`
 
-## 4.9 Simple Scrape Command
+## 4.8 Simple Scrape Command
 
 User: `scrape Facebook`
 
@@ -558,16 +481,13 @@ Hermes MUST:
 4. Save `data/output/facebook_scraped_output.csv`
 5. Verify results
 6. Update Master Creator CRM
-7. Update/create Facebook creator notes
-8. Update `Platforms/Facebook.md`
-9. Update `Daily/YYYY-MM-DD.md`
-10. Check relevant Projects/Research
-11. Verify synchronization
-12. Report completion
+7. Update `Platforms/Facebook.md`
+8. Update `Daily/YYYY-MM-DD.md`
+9. Check relevant Projects/Research
+10. Verify synchronization
+11. Report completion
 
-The user should NOT have to say "scrape Facebook and update Obsidian" or "scrape Facebook and update the CRM" because both are already mandatory.
-
-## 4.10 Existing Output Files
+## 4.9 Existing Output Files
 
 If the requested scraper discovers that an output CSV already exists:
 
@@ -576,50 +496,7 @@ If the requested scraper discovers that an output CSV already exists:
 - If the current scrape was not actually executed, clearly state that
 - If the user explicitly asks to refresh/re-scrape, run the scraper
 
-## 4.11 Obsidian Creator Note Structure
-
-Use this structure for creator notes:
-
-```markdown
----
-name:
-handle:
-platform:
-profile_url:
-followers:
-email:
-category:
-language:
-region:
-ai_tools:
-status:
-discovered_at:
-last_scraped_at:
-last_verified:
----
-
-# Creator Name
-
-## Profile
-
-## Content
-
-## AI / Technology
-
-## AI Tools
-
-## Evidence
-
-## Analysis
-
-## Notes
-
-## Related
-```
-
-Only populate fields supported by available evidence. Use `Unknown` when information cannot be verified.
-
-## 4.12 Data Priority
+## 4.10 Data Priority
 
 When information exists in multiple places, prefer the newest verified information:
 
@@ -756,76 +633,9 @@ Do not access private information, private accounts, passwords, tokens, or unaut
 
 ---
 
-# 7. OBSIDIAN
+# 7. SCRAPER DEVELOPMENT
 
-## 7.1 Vault Structure
-
-The Obsidian vault is located at:
-
-`obsidian/Creator Research/`
-
-```text
-obsidian/
-└── Creator Research/
-    ├── Attachments/
-    ├── Creators/
-    ├── Daily/
-    ├── Platforms/
-    ├── Projects/
-    └── Research/
-```
-
-Do not create another Obsidian vault. Do not write outside this directory.
-
-## 7.2 Creators/
-
-Individual creator notes. After discovery or scraping, every creator should have a note.
-
-Before creating a note, search for existing notes using ProfileURL, Platform + Handle, or Creator Name.
-
-## 7.3 Platforms/
-
-Platform-level documentation. Create or update only when useful information about the platform is discovered.
-
-Use wikilinks to connect creator notes:
-
-```markdown
-[[runwayml]]
-[[mkbhd]]
-```
-
-## 7.4 Daily/
-
-Daily research and scraping logs. Create/update after discovery or scraping sessions.
-
-## 7.5 Research/
-
-Research findings that are not individual creator profiles. Use for trends, comparative research, methodology.
-
-Do not put individual creator profiles here.
-
-## 7.6 Projects/
-
-Project-specific documentation. Update only when associated with an existing project.
-
-## 7.7 Attachments/
-
-Files intentionally associated with Obsidian notes. Never store secrets, credentials, or private information here.
-
-## 7.8 Cross-Linking
-
-Use Obsidian `[[wikilinks]]` when useful:
-
-- Link creators to platform notes
-- Link creators to research notes
-- Link daily logs to platform notes
-- Link project notes to relevant creators
-
----
-
-# 8. SCRAPER DEVELOPMENT
-
-## 8.1 Principles
+## 7.1 Principles
 
 Before creating a new scraper:
 
@@ -837,7 +647,7 @@ Before creating a new scraper:
 
 Typical scraper location: `code/scraper/`
 
-## 8.2 Modifying Scrapers
+## 7.2 Modifying Scrapers
 
 1. Read the existing implementation
 2. Understand the current behavior
@@ -852,13 +662,13 @@ Use: clear functions, meaningful variable names, error handling, logging, valida
 
 Avoid unnecessary rewrites.
 
-## 8.3 Crawl4AI
+## 7.3 Crawl4AI
 
 Crawl4AI is installed in this project. Use it when it provides a reliable advantage for browser-based scraping, but do not automatically replace existing platform scrapers.
 
 Test Crawl4AI against the existing scraper before replacing one.
 
-## 8.4 AI Classification
+## 7.4 AI Classification
 
 AI classification must remain separate from the scraping layer. The scraper collects raw information first. The AI classification layer determines tags, PrimaryAITool, AIGCVerdict, Language, Evidence.
 
@@ -866,13 +676,13 @@ Do not hardcode the AI provider into scraping logic.
 
 ---
 
-# 9. ERROR HANDLING
+# 8. ERROR HANDLING
 
 When something fails:
 
 1. Read the complete error
 2. Identify the actual cause
-3. Inspect the relevant code or configuration
+3. Inspect the relevant code or config
 4. Determine whether the problem is temporary or permanent
 5. Make the smallest appropriate fix
 6. Test again
@@ -892,7 +702,7 @@ If a profile cannot be scraped:
 
 ---
 
-# 10. REPORTING
+# 9. REPORTING
 
 When reporting completed work, use a clear structure:
 
@@ -902,7 +712,6 @@ Completed:
 - Verified 18 creators.
 - Removed 7 duplicates or irrelevant profiles.
 - Added 18 records to the dataset.
-- Created 12 Obsidian creator notes.
 
 Issues:
 - 3 profiles could not be verified.
@@ -917,7 +726,7 @@ Clearly distinguish: completed work, verified information, assumptions, errors, 
 
 ---
 
-# 11. PROJECT STRUCTURE
+# 10. PROJECT STRUCTURE
 
 The actual project structure:
 
@@ -952,14 +761,7 @@ Creator Research System/
 │   │   ├── tiktok_scraped_output.csv
 │   │   └── youtube_refreshed_output.csv
 │   └── Creator-Intel-CRM-List.csv
-└── obsidian/
-    └── Creator Research/
-        ├── Attachments/
-        ├── Creators/
-        ├── Daily/
-        ├── Platforms/
-        ├── Projects/
-        └── Research/
+└── .gitignore
 ```
 
 IMPORTANT:
@@ -967,15 +769,13 @@ IMPORTANT:
 - The project uses lowercase `data/`, not `Data/`
 - The input directory is `data/input/`
 - The output directory is `data/output/`
-- The Obsidian vault is `obsidian/Creator Research/`
-- Creator notes are stored in `obsidian/Creator Research/Creators/`
 - Scrapers are stored in `code/scraper/`
 
 Do not invent alternative directories unless the user explicitly requests a restructuring.
 
 ---
 
-# 12. VERSION CONTROL
+# 11. VERSION CONTROL
 
 If Git is used:
 
@@ -986,11 +786,11 @@ If Git is used:
 
 ---
 
-# 13. SECRETS
+# 12. SECRETS
 
 Never place secrets inside:
 
-- Source code, Markdown notes, Obsidian notes
+- Source code, Markdown notes
 - CSV files, JSON files, README files
 - Git commits
 
@@ -1000,7 +800,7 @@ Never expose actual secret values.
 
 ---
 
-# 14. DATA PROCESSING
+# 13. DATA PROCESSING
 
 Use deterministic code whenever possible.
 
@@ -1012,7 +812,7 @@ Do not use AI unnecessarily for operations that can be performed reliably with d
 
 ---
 
-# 15. DATA PIPELINE
+# 14. DATA PIPELINE
 
 The preferred workflow:
 
@@ -1036,15 +836,13 @@ Validation
 AI Analysis
     ↓
 Final Dataset
-    ↓
-Obsidian Knowledge Base
 ```
 
 Keep raw data separate from processed data. Do not overwrite raw data unnecessarily.
 
 ---
 
-# 16. FILE MANAGEMENT
+# 15. FILE MANAGEMENT
 
 Before editing a file:
 
@@ -1074,7 +872,7 @@ The overall objective is to produce creator intelligence that is:
 
 ---
 
-# 17. CRM DATA QUALITY & CSV FORMATTING
+# 16. CRM DATA QUALITY & CSV FORMATTING
 
 This section ensures every creator record persisted in `data/Creator-Intel-CRM-List.csv` is strictly verified, normalized, schema-compliant, deduplicated, and safe to persist. The system follows a **Validation-Before-Persistence** architecture:
 
@@ -1084,7 +882,7 @@ Search → Discover → Verify → Deduplicate → Scrape → Data Quality Gate 
 
 **Do not rely on downstream cleanup scripts.** If a record fails validation and cannot be safely normalized, reject it.
 
-## 17.1 CSV Data Contract & Schema Guardrails
+## 16.1 CSV Data Contract & Schema Guardrails
 
 Before preparing any record for CRM insertion, enforce the active schema:
 
@@ -1099,7 +897,7 @@ Before preparing any record for CRM insertion, enforce the active schema:
   - HTML, CSS, or navigation tags
   - Platform interface noise
 
-## 17.2 Normalization Rules
+## 16.2 Normalization Rules
 
 ### Platform Names
 Enforce canonical casing:
@@ -1116,13 +914,13 @@ Transform common variations (e.g., `tiktok`, `TIKTOK` → `TikTok`; `fb`, `faceb
 - Extract the genuine human, brand, or channel display name.
 - Explicitly reject platform navigation text, page titles representing errors (e.g., "Page Not Found", "Log In / Sign Up"), raw numeric user IDs (e.g., Facebook internal numeric IDs like `100088664633967`), and SERP titles.
 
-## 17.3 Profile URL Sanitization
+## 16.3 Profile URL Sanitization
 
 - Strip all tracking parameters (`utm_*`, `fbclid`, `si`, `ref`, etc.) and non-essential hash fragments.
 - Store canonical profile/channel base URLs only.
 - **Strict Rejection:** Never store search engine URLs (Google, Bing), platform search queries (e.g., `tiktok.com/search?q=...`), hashtag feeds, or generic directory aggregators as creator URLs.
 
-## 17.4 Pre-Scrape & Pre-Merge Deduplication
+## 16.4 Pre-Scrape & Pre-Merge Deduplication
 
 Before spending compute to scrape or attempting to merge, perform case-insensitive duplicate checks across:
 1. `data/input/input_channels.csv`
@@ -1135,53 +933,53 @@ Matching criteria:
 
 If a match is found in either file, mark it as a duplicate and skip insertion.
 
-## 17.5 Discovery & Search Result Validation
+## 16.5 Discovery & Search Result Validation
 
 Search results are leads, not verified records:
 1. Confirm the creator profile actually exists and belongs to a real entity matching the research criteria.
 2. Extract bio, handles, and metadata directly from the source profile, not from search engine preview snippets.
 3. Reject generic landing pages, topic/category hubs, community group sidebars, and spam directories.
 
-## 17.6 The Scraped Data Quality Gate
+## 16.6 The Scraped Data Quality Gate
 
 After running the scraper (e.g., `python3 code/scraper/run.py --url <profile-url> --limit 1`), inspect the output before touching the CRM:
 
 - **Facebook Artifact Detection:** Detect and eliminate common scraped UI/navigation artifacts (e.g., `Lagi`, `Rakan`, `Foto`, `Perihal`, `Pekerjaan`, `mengikuti`, `Siaran`, `tempat ker`, `Tiada`). Only strip these tokens when they represent platform UI noise—never truncate legitimate creator bios.
 - **Content Integrity:** Verify fields contain substantive human text. If scraping fails or hits a login wall, reject the payload rather than persisting garbage or partial UI text.
 
-## 17.7 EvidenceJSON Formatting
+## 16.7 EvidenceJSON Formatting
 
 - Must parse as valid RFC 8259 JSON.
 - Never output Python string representations (e.g., do not output `{'status': 'verified'}`). Use valid double-quoted JSON: `{"status": "verified"}`.
 - Properly escape all internal quotes, backslashes, and line breaks so they do not fracture CSV columns.
 - If evidence is malformed and cannot be reliably parsed or reconstructed, drop the invalid segment rather than saving corrupted text.
 
-## 17.8 CSV Encoding & Delimiter Safety
+## 16.8 CSV Encoding & Delimiter Safety
 
 - **Tooling Contract:** Never construct or append CSV rows using manual string formatting or raw string concatenation.
 - **Escaping:** Use standard CSV libraries (`csv.writer` with `csv.QUOTE_MINIMAL` or `csv.QUOTE_ALL`) to safely encapsulate fields containing commas, line breaks, emojis, and quotes.
 - **Character Encoding:** Always read and write using `utf-8` without BOM. Ensure international text, Malay terms, and Unicode characters remain uncorrupted.
 
-## 17.9 Column Count & Header Integrity
+## 16.9 Column Count & Header Integrity
 
 - **Header Locking:** The CSV header line is immutable. Never duplicate, append, or re-insert header rows into the data body.
 - **Row Width Invariant:** If the header defines $N$ columns, every single row written to the file must parse to exactly $N$ fields.
 - **Immediate Abort:** If an output row produces $N \pm 1$ columns, abort the merge immediately, roll back the write, and flag the faulty record.
 
-## 17.10 Merge Safety & Target Invariants
+## 16.10 Merge Safety & Target Invariants
 
 - **Controlled Ingestion:** Never bypass the designated `merge_to_crm()` utility. All writes must go through this centralized merge path.
 - **Protected Files:** `data/input/input_channels.csv` is read-only for this process. Never modify, overwrite, or delete input records.
 - **Update Behavior:** When merging new information for an existing creator, preserve established, verified records. Do not overwrite populated fields with empty values or lower-confidence data.
 
-## 17.11 Failure Handling
+## 16.11 Failure Handling
 
 If an entry fails any validation step:
 1. **Drop / Skip:** Do not attempt to force, fabricate, or guess missing information.
 2. **Log:** Note the specific failure mode (e.g., `[SKIP] Invalid handle format: <val>`, `[SKIP] Duplicate detected: <val>`, `[REJECT] Failed JSON contract`).
 3. **Proceed:** Move cleanly to the next candidate in the queue.
 
-## 17.12 Operational Rule for Cron & Agent Execution
+## 16.12 Operational Rule for Cron & Agent Execution
 
 When processing channels:
 1. Execute discovery and run scraper targets.
@@ -1192,13 +990,13 @@ When processing channels:
 
 ---
 
-# 18. CRM DATA QUALITY GATE — MANDATORY ENFORCEMENT
+# 17. CRM DATA QUALITY GATE — MANDATORY ENFORCEMENT
 
-The CRM Data Quality & CSV Formatting rules from Section 17 are mandatory for EVERY creator discovery, scraping, enrichment, and CRM merge operation.
+The CRM Data Quality & CSV Formatting rules from Section 16 are mandatory for EVERY creator discovery, scraping, enrichment, and CRM merge operation.
 
 No creator record may be written to `data/Creator-Intel-CRM-List.csv` until it has passed all applicable validation checks.
 
-## 18.1 Mandatory Processing Order
+## 17.1 Mandatory Processing Order
 
 1. Discover creator
 2. Verify creator profile
@@ -1214,7 +1012,7 @@ No creator record may be written to `data/Creator-Intel-CRM-List.csv` until it h
 10. Call the existing `merge_to_crm()` logic
 11. Validate the CRM again after merge
 
-## 18.2 Hard Rules
+## 17.2 Hard Rules
 
 - **NEVER** bypass `merge_to_crm()`.
 - **NEVER** manually append raw CSV rows.
@@ -1226,7 +1024,7 @@ No creator record may be written to `data/Creator-Intel-CRM-List.csv` until it h
 - **NEVER** allow search-result URLs to enter the CRM.
 - **NEVER** overwrite verified CRM values unnecessarily.
 
-## 18.3 Failure Protocol
+## 17.3 Failure Protocol
 
 If a record fails validation:
 ```
@@ -1235,17 +1033,17 @@ REJECT → LOG REASON → SKIP RECORD → CONTINUE
 
 Do not "fix" uncertain information by guessing.
 
-## 18.4 Cron Execution
+## 17.4 Cron Execution
 
 For cron execution, the same rules apply to every run. Each scheduled run must independently validate every record through the full Data Quality Gate before any merge_to_crm() call.
 
 ---
 
-# 19. OUTPUT FORMATTING STANDARD
+# 18. OUTPUT FORMATTING STANDARD
 
 All platform scrapers must enforce these formatting rules **before any row is merged into the CRM**, regardless of platform. These rules are mandatory for every scrape, discovery, and merge operation.
 
-## 19.1 Follower Count Normalization
+## 18.1 Follower Count Normalization
 
 - Always normalize to English **K/M/B notation** regardless of platform locale.
   - `"1.1J"` (Malay: juta = million) → `"1.1M"`
@@ -1256,7 +1054,7 @@ All platform scrapers must enforce these formatting rules **before any row is me
 
 Use the shared helper: `normalize_follower_to_kmb(raw)` from `code/scraper/common.py`.
 
-## 19.2 Bio/Preview Text Cleanup
+## 18.2 Bio/Preview Text Cleanup
 
 - Strip **platform UI chrome** from bio/preview text for **every platform**, not just Facebook:
   - Malay/Indonesian tokens: `Lagi`, `Siaran`, `Perihal`, `Reels`, `Foto`, `Pengenalan`, `mengikuti`, `pengikut`
@@ -1268,14 +1066,14 @@ Use the shared helper: `normalize_follower_to_kmb(raw)` from `code/scraper/commo
 
 Use the shared helper: `clean_platform_ui_text(text)` from `code/scraper/common.py`.
 
-## 19.3 Locale Consistency
+## 18.3 Locale Consistency
 
 - **Force English (en-US) locale** + `Accept-Language: en-US,en;q=0.9` on **every** Playwright browser session, for **every platform** scraper.
 - This prevents scraped UI text from being returned in another language (Malay, Indonesian, Spanish, French, etc.).
 - Use the shared helper: `create_english_context(browser)` from `code/scraper/common.py`.
 - Non-browser scrapers (YouTube via yt-dlp, Vimeo via yt-dlp, Civitai via API) are not affected by browser locale but must still normalize follower counts and clean bio text.
 
-## 19.4 Link Resolution
+## 18.4 Link Resolution
 
 - Always resolve `external_link` / `SampleContentURL` to the **final real URL**.
 - Decode any **URL-encoded/double-wrapped links** before saving.
@@ -1283,16 +1081,16 @@ Use the shared helper: `clean_platform_ui_text(text)` from `code/scraper/common.
   - e.g. Facebook redirect `l.facebook.com/l.php?u=...` → decoded target URL
 - Use the shared helper: `resolve_final_url(url)` from `code/scraper/common.py`.
 
-## 19.5 Record Completeness Gate
+## 18.5 Record Completeness Gate
 
 - **Never** merge a "discovery-only" or partially-scraped record (missing `follower_count` AND `bio_preview`) into the main CRM, **regardless of platform**.
 - Route incomplete records to a separate **pending-review queue** (`data/pending_review.csv`) instead.
 - This is enforced by `is_discovery_only()` and `route_to_pending_review()` in `code/scraper/common.py`, called automatically by `merge_to_crm()`.
 - The pending-review queue is for manual review — these records must NOT pollute the Master CRM.
 
-## 19.6 Validation on Every Merge
+## 18.6 Validation on Every Merge
 
-- Run the existing **Data Quality Gate** (AGENTS.md Sections 17-18) on **every** `merge_to_crm()` call, no exceptions per platform:
+- Run the existing **Data Quality Gate** (AGENTS.md Sections 16-17) on **every** `merge_to_crm()` call, no exceptions per platform:
   - Schema: 19 columns, exact column count
   - Normalization: K/M/B follower format, clean bio text
   - Dedup: case-insensitive ProfileURL match
@@ -1301,7 +1099,7 @@ Use the shared helper: `clean_platform_ui_text(text)` from `code/scraper/common.
   - No Malay/foreign UI contamination in Notes
 - On failure: `REJECT → LOG REASON → SKIP RECORD → CONTINUE`.
 
-## 19.7 Cross-Platform Application
+## 18.7 Cross-Platform Application
 
 These rules apply to all platform scrapers:
 - **TikTok** (`code/scraper/tiktok.py`)
@@ -1317,7 +1115,7 @@ These rules apply to all platform scrapers:
 
 ---
 
-# 20. GOOGLE SHEETS INTEGRATION (OPTIONAL)
+# 19. GOOGLE SHEETS INTEGRATION (OPTIONAL)
 
 An optional Google Sheets sync step runs automatically after `merge_to_crm()` succeeds, configured entirely via `.env`.
 
@@ -1339,4 +1137,3 @@ An optional Google Sheets sync step runs automatically after `merge_to_crm()` su
 - Only fully validated CRM rows are synced (pending_review records are excluded)
 - Module: `code/scraper/sheets_sync.py`
 - Library: `gspread` + `google-auth` (added to `requirements.txt`)
-

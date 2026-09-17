@@ -125,9 +125,23 @@ def fetch_civitai_creator(username: str, model_provider=None, model_name=None):
             "ai_reasoning": ai_meta.get("Evidence", "")
         }
 
+        # Fetch the web page to get followerCountAllTime
+        follower_count = None
+        try:
+            page_url = f"https://civitai.com/user/{actual_username}"
+            page_res = requests.get(page_url, timeout=10, headers={'User-Agent': 'Mozilla/5.0'})
+            if page_res.status_code == 200:
+                match = re.search(r'"followerCountAllTime":(\d+)', page_res.text)
+                if match:
+                    follower_count = int(match.group(1))
+        except Exception:
+            pass
+
+        follower_str = f"{follower_count:,}" if follower_count else "N/A"
+
         return {
             "Handle": f"@{actual_username}",
-            "FollowerCount": "N/A", # Civitai API creators endpoint doesn't always expose exact followers directly, keep N/A or compute if available
+            "FollowerCount": follower_str,
             "Email": email,
             "Tags": ", ".join(ai_meta.get("Tags", [])) if isinstance(ai_meta.get("Tags"), list) else str(ai_meta.get("Tags")),
             "LastScrapedAt": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),

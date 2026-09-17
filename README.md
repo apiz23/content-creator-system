@@ -36,15 +36,7 @@ Creator Research System/
 │   │   └── *_scraped_output.csv           ← Per-platform scraper outputs
 │   ├── Creator-Intel-CRM-List.csv         ← Master CRM (SINGLE SOURCE OF TRUTH)
 │   └── backups/                           ← Timestamped CRM backups
-├── obsidian/                              ← Knowledge base (in .gitignore)
-│   ├── Creator Research/
-│   │   ├── Creators/                      ← Individual creator notes
-│   │   ├── Platforms/                     ← Platform documentation
-│   │   ├── Daily/                         ← Daily research logs
-│   │   ├── Projects/                      ← Project-specific notes
-│   │   └── Research/                      ← Research findings
-│   └── Attachments/
-└── .gitignore                             ← Ignores obsidian/, .venv/, output CSVs
+└── .gitignore                             ← Ignores .venv/, output CSVs
 ```
 
 ## Hermes Plugin
@@ -191,8 +183,7 @@ No additional configuration is required. The plugin resolves paths relative to i
 2. **Scrapes** verified profiles using platform-specific Playwright-based scrapers
 3. **Validates** every record through a mandatory Data Quality Gate before persistence
 4. **Merges** into a master CRM using `merge_to_crm()` with safe-write procedure (read → check duplicate → update/append → validate → verify)
-5. **Synchronizes** to an Obsidian knowledge base with wikilinked notes
-6. **Automates** via scheduled cron jobs with continuity mode
+5. **Automates** via scheduled cron jobs with continuity mode
 
 ## Core Principles
 
@@ -205,10 +196,10 @@ No additional configuration is required. The plugin resolves paths relative to i
 
 ## Key Files
 
-- **`AGENTS.md`** — Full agent workflow rules (17 sections covering data safety, normalization, scraping, Obsidian sync, cron jobs, and CRM Data Quality Gate)
+- **`AGENTS.md`** — Full agent workflow rules (16 sections covering data safety, normalization, scraping, cron jobs, and CRM Data Quality Gate)
 - **`code/scraper/run.py`** — Unified dispatcher: `python3 code/scraper/run.py --url <profile-url> --limit 1`
 - **`code/scraper/common.py`** — Shared utilities including `merge_to_crm()`, `load_and_clean_csv()`, `detect_platform_from_url()`, `extract_email()`
-- **`data/Creator-Intel-CRM-List.csv`** — Master CRM (1114 rows as of 2026-09-17, 90 Facebook profiles)
+- **`data/Creator-Intel-CRM-List.csv`** — Master CRM (1117 rows as of 2026-09-17, 90 Facebook profiles)
 - **`data/input/input_channels.csv`** — Persistent scraping queue (1001 rows)
 
 ## Scraper Usage

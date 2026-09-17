@@ -3,10 +3,10 @@
 Unified scraper dispatcher with full-CSV batch dispatch.
 
 Usage:
-    python3 Code/scraper/run.py --platform tiktok --limit 5
-    python3 Code/scraper/run.py --url https://www.tiktok.com/@example --limit 1
-    python3 Code/scraper/run.py --input data/input/input_channels.csv --limit 10
-    python3 Code/scraper/run.py --help
+    python3 code/scraper/run.py --platform tiktok --limit 5
+    python3 code/scraper/run.py --url https://www.tiktok.com/@example --limit 1
+    python3 code/scraper/run.py --input data/input/input_channels.csv --limit 10
+    python3 code/scraper/run.py --help
 """
 
 import sys
@@ -278,10 +278,10 @@ Supported platforms:
   tiktok, instagram, facebook, linkedin, reddit, threads, youtube, vimeo, civitai
 
 Examples:
-  python3 Code/scraper/run.py --platform tiktok --limit 5
-  python3 Code/scraper/run.py --url https://www.tiktok.com/@example --limit 1
-  python3 Code/scraper/run.py --input data/input/input_channels.csv --limit 10
-  python3 Code/scraper/run.py --input data/input/input_channels.csv --model-provider api --model-name gpt-5.6
+  python3 code/scraper/run.py --platform tiktok --limit 5
+  python3 code/scraper/run.py --url https://www.tiktok.com/@example --limit 1
+  python3 code/scraper/run.py --input data/input/input_channels.csv --limit 10
+  python3 code/scraper/run.py --input data/input/input_channels.csv --model-provider api --model-name gpt-5.6
         """
     )
     

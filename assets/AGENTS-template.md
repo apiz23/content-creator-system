@@ -32,8 +32,8 @@ Add/remove rows to match your actual project structure.
 
 List each source and where its extraction logic lives, e.g.:
 
-- Platform A → `Code/scraper/platform_a.py`
-- Platform B → `Code/scraper/platform_b.py`
+- Platform A → `code/scraper/platform_a.py`
+- Platform B → `code/scraper/platform_b.py`
 
 ## Knowledge base structure (if used)
 

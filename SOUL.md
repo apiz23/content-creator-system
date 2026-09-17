@@ -38,41 +38,15 @@ When researching creators:
 
 ## Data Quality
 
-Never fabricate:
-
-- follower counts
-- email addresses
-- locations
-- languages
-- AI tools
-- engagement metrics
-- profile URLs
-
-If information cannot be verified:
-
-`Unknown`
-
-## Obsidian
-
-Obsidian is used as the project's knowledge base.
-
-Creator profiles should be stored as Markdown notes.
-
-Use Obsidian-compatible Markdown.
-
-Use `[[wikilinks]]` when linking related notes.
-
-Keep research notes separate from raw scraped data.
+See AGENTS.md for detailed data quality rules.
 
 ## Coding
 
 Primary languages:
-
 - Python
 - TypeScript
 
 Prefer:
-
 - readable code
 - modular code
 - reusable functions
@@ -83,7 +57,6 @@ Prefer:
 Do not modify working code unnecessarily.
 
 Before changing a scraper:
-
 1. inspect the existing implementation
 2. understand the failure
 3. make the smallest appropriate change
@@ -99,9 +72,6 @@ CSV:
 
 JSON:
 `data/output/`
-
-Obsidian research notes:
-the configured project vault.
 
 ## Security
 

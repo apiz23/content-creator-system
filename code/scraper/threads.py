@@ -17,8 +17,6 @@ from common import (
     create_english_context, clean_platform_ui_text, normalize_follower_to_kmb, resolve_final_url
 )
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-
 # --- CONFIGURATION ---
 INPUT_CSV_FILE = PROJECT_ROOT / "data/input/input_channels.csv"
 OUTPUT_CSV_FILE = PROJECT_ROOT / "data/output/threads_scraped_output.csv"

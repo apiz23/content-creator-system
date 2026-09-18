@@ -162,7 +162,13 @@ class GoogleSheetsClient:
             result = self._invoke(
                 "get", self._spreadsheet_id, f"'{tab_name}'!A1:A1"
             )
-            values = result.get("values", [])
+            # Handle both list format (direct JSON) and dict format
+            if isinstance(result, list):
+                values = result
+            elif isinstance(result, dict):
+                values = result.get("values", [])
+            else:
+                return False
             return len(values) > 0 and len(values[0]) > 0
         except Exception:
             return False
@@ -178,7 +184,13 @@ class GoogleSheetsClient:
             First row is the header.
         """
         result = self._invoke("get", self._spreadsheet_id, range_name)
-        values = result.get("values", [])
+        # Handle both list format (direct JSON) and dict format
+        if isinstance(result, list):
+            values = result
+        elif isinstance(result, dict):
+            values = result.get("values", [])
+        else:
+            values = []
         return values
 
     def append_rows(self, range_name: str, values: list[list[Any]]) -> dict:

@@ -239,28 +239,39 @@ view for supervisors.
 
 ### Architecture
 
+This repository does NOT manage Google OAuth credentials.
+Instead, it calls the existing Hermes Google Sheets CLI as a subprocess.
+
 ```text
 Creator Research / Scraper
           |
           v
     Existing CSV data (source of truth)
-         /         \
-        /           \
-       v             v
-Google Sheets     CSV Backup
-(view only)       (data/backups/)
+         |
+         v
+    Hermes google_api.py (subprocess)
+         |
+         v
+    Hermes-managed OAuth
+         |
+         v
+    Google Sheets
 ```
 
-### Authentication Setup
+The existing `hermes-creator-intel` project on the supervisor's Mac Mini
+continues working independently. Both systems can share the same Hermes
+OAuth authentication.
 
-1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Create a project (or select existing)
-3. Enable the **Google Sheets API**
-4. Create credentials: **OAuth Client ID** → **Desktop app**
-5. Download `credentials.json` and place it in the project root
-6. The first run will open a browser for authorization; the token is saved to `token.json`
+### Credentials
 
-**Never commit** `credentials.json` or `token.json` — both are in `.gitignore`.
+**No credentials.json, token.json, or OAuth setup is required in this repo.**
+All Google authentication is handled by the existing Hermes installation on
+the supervisor's machine.
+
+On the supervisor's Mac Mini, Hermes provides:
+- `$HERMES_HOME/google_token.json`
+- `$HERMES_HOME/google_client_secret.json`
+- `$HERMES_HOME/skills/productivity/google-workspace/scripts/google_api.py`
 
 ### Configuration
 
@@ -270,10 +281,19 @@ Copy `.env.example` to `.env` and set:
 # Google Sheets (ONE-WAY: CSV -> Google Sheets)
 GOOGLE_SHEETS_SPREADSHEET_ID=1zd1KitpivqABavEVzVUCAS9PVMG2G47b8HbCl7YqB-4
 GOOGLE_SHEETS_TAB_NAME=Creator Intel
+GOOGLE_SHEETS_RANGE='Creator Intel'!A:S
+
+# Optional: when Hermes is installed in a non-standard location.
+# On the supervisor's Mac Mini, these point to the existing Hermes:
+# HERMES_GOOGLE_API_PYTHON=/Users/Kidd-Agent/.hermes/gws-venv/bin/python
+# HERMES_GOOGLE_API_SCRIPT=/Users/Kidd-Agent/.hermes/skills/productivity/google-workspace/scripts/google_api.py
 ```
 
-- `GOOGLE_SHEETS_TAB_NAME` is **required** — the tab must already exist in the spreadsheet.
-- `GOOGLE_SHEETS_RANGE` is optional; if omitted, it auto-generates from the tab name and column count.
+- `GOOGLE_SHEETS_SPREADSHEET_ID` is **required** — the target spreadsheet ID.
+- `GOOGLE_SHEETS_TAB_NAME` is **required** — the tab must already exist.
+- `GOOGLE_SHEETS_RANGE` is optional; defaults to `'Creator Intel'!A:S`.
+- `HERMES_GOOGLE_API_PYTHON` and `HERMES_GOOGLE_API_SCRIPT` are optional
+  — they point to the Hermes installation on the supervisor's machine.
 
 ### Commands
 
@@ -295,6 +315,16 @@ Or use the backup utility directly:
 python -c "from code.scraper.common import backup_crm; print(backup_crm())"
 ```
 
+### Re-scrape (safe field-level enrichment)
+
+Re-scrape existing CRM creators for data enrichment:
+
+```bash
+python run_sheets.py rescrape --source csv --limit 5 --no-sync
+```
+
+The `--no-sync` flag prevents Google Sheets from being updated during testing.
+
 ### Data Schema
 
 The Google Sheet receives exactly these 19 columns in order (A:S):
@@ -305,19 +335,37 @@ The Google Sheet receives exactly these 19 columns in order (A:S):
 
 1. Validates the CRM CSV has all 19 required columns
 2. Creates a timestamped backup in `data/backups/`
-3. Connects to Google Sheets using OAuth credentials
+3. Calls the Hermes google_api.py subprocess
 4. Verifies the target tab exists
-5. Clears existing data in the target range
-6. Writes the header row + all CRM rows
-7. Verifies the write succeeded
+5. Performs field-level updates (column-level for re-scrape, append-only for new creators)
+6. Verifies the write succeeded
 
 ### Common Errors
 
 - `GOOGLE_SHEETS_TAB_NAME is not configured` — Set `GOOGLE_SHEETS_TAB_NAME` in `.env`
 - `Missing required columns` — The CRM CSV is missing one or more of the 19 expected columns
-- `Credentials file not found` — Place `credentials.json` in the project root
+- `Hermes google_api.py not found` — Set `HERMES_GOOGLE_API_SCRIPT` to point to the existing Hermes installation
 - `Target tab does not exist` — Create the tab in the spreadsheet manually first
-- `Failed to authenticate` — Ensure `credentials.json` is valid and the Sheets API is enabled
+- `Non-zero returncode` — The Hermes google_api.py subprocess failed
+
+### Safety
+
+- New creators use **append-only** writes
+- Re-scraped creators use **column-level updates** only
+- Existing rows are **never deleted**
+- No `batchClear`, `fullReplace`, or `deleteRow` operations
+- Failed scrapes **preserve** existing data
+- Empty/null/NaN/N/A values **never overwrite** existing fields
+- Immutable fields (ProfileURL, DiscoveredAt, Source, OutreachStatus) are preserved
+- Human-maintained fields (Email, Notes, OutreachStatus) are preserved
+
+## hermes-creator-intel
+
+The existing `hermes-creator-intel` project on the supervisor's Mac Mini
+is a separate system. It continues to manage its own Google OAuth flow
+and credentials. This repository does NOT replace it, copy its credentials,
+or create a second OAuth flow. Both systems can coexist and share the same
+Hermes authentication.
 
 ## Status
 

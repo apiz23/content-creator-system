@@ -319,7 +319,7 @@ class TestAutoSyncToSheets:
         config = load_config()
         assert config.spreadsheet_id, "Spreadsheet ID must be configured"
         assert config.tab_name == "Temp", "Tab name must be Temp"
-        assert config.credentials_path is not None
+        assert not hasattr(config, "credentials_path"), "No credentials_path in new config"
 
     def test_auto_sync_exporter_initializes(self):
         """GoogleSheetsExporter can be instantiated."""

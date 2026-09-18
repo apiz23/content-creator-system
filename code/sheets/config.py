@@ -1,7 +1,8 @@
 """Configuration loading for Google Sheets integration.
 
 Reads settings from .env and environment variables.
-All credentials are loaded from environment or local credential files.
+No credentials are stored in this repository.
+All Google Sheets operations go through the Hermes google_api.py wrapper.
 """
 
 import os
@@ -10,7 +11,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-# Load .env from project root (code/sheets/ → code/ → project root)
+# Load .env from project root
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 load_dotenv(_PROJECT_ROOT / ".env")
 
@@ -24,27 +25,37 @@ GOOGLE_SHEETS_TAB_NAME = os.environ.get(
     "GOOGLE_SHEETS_TAB_NAME", ""
 ).strip()
 
-# Optional: explicit range override (e.g. "Creator Intel!A:S")
+# Optional: explicit range override (e.g. "'Creator Intel'!A:S")
 # If not set, range is auto-generated from tab name and column count.
 GOOGLE_SHEETS_RANGE = os.environ.get(
     "GOOGLE_SHEETS_RANGE", ""
 ).strip()
 
-# --- Credential paths ---
-# Default locations for Google OAuth credentials.
-# The user places credentials.json here manually.
-CREDENTIALS_FILE = _PROJECT_ROOT / "credentials.json"
-TOKEN_FILE = _PROJECT_ROOT / "token.json"
+# --- Hermes Google Sheets CLI configuration ---
+# These paths point to the existing Hermes installation on the
+# supervisor's Mac Mini. They are optional during local development
+# and are only needed when an actual Google Sheets operation is
+# attempted.
+
+HERMES_GOOGLE_API_PYTHON = os.environ.get(
+    "HERMES_GOOGLE_API_PYTHON", ""
+).strip()
+
+HERMES_GOOGLE_API_SCRIPT = os.environ.get(
+    "HERMES_GOOGLE_API_SCRIPT", ""
+).strip()
 
 
 @dataclass
 class SheetsConfig:
-    """Configuration for the Google Sheets exporter."""
+    """Configuration for the Google Sheets exporter.
+
+    Does not require credentials.json or token.json.
+    All authentication is handled by the Hermes installation.
+    """
 
     spreadsheet_id: str
     tab_name: str
-    credentials_path: Path
-    token_path: Path
     range_override: str = ""
 
     @property
@@ -60,17 +71,34 @@ class SheetsConfig:
         return f"'{self.tab_name}'!A:{column_letter}"
 
     def validate(self) -> list[str]:
-        """Validate configuration and return a list of errors."""
+        """Validate configuration and return a list of errors.
+
+        Does NOT check for credentials — the Hermes wrapper
+        handles authentication.
+        """
         errors: list[str] = []
         if not self.spreadsheet_id:
-            errors.append("GOOGLE_SHEETS_SPREADSHEET_ID is not configured.")
-        if not self.tab_name:
-            errors.append("GOOGLE_SHEETS_TAB_NAME is not configured.")
-        if not self.credentials_path.exists():
             errors.append(
-                f"Credentials file not found: {self.credentials_path}\n"
-                "Please create credentials.json from Google Cloud Console.\n"
-                "See README.md for setup instructions."
+                "GOOGLE_SHEETS_SPREADSHEET_ID is not configured."
+            )
+        if not self.tab_name:
+            errors.append(
+                "GOOGLE_SHEETS_TAB_NAME is not configured."
+            )
+        return errors
+
+    def validate_adapter(self) -> list[str]:
+        """Validate that the Hermes google_api.py adapter is configured.
+
+        Returns:
+            List of adapter configuration errors.
+        """
+        errors: list[str] = []
+        if not HERMES_GOOGLE_API_SCRIPT:
+            errors.append(
+                "HERMES_GOOGLE_API_SCRIPT is not configured. "
+                "Set this to the path of the Hermes google_api.py "
+                "on the supervisor's machine."
             )
         return errors
 
@@ -84,8 +112,6 @@ def load_config() -> SheetsConfig:
     config = SheetsConfig(
         spreadsheet_id=GOOGLE_SHEETS_SPREADSHEET_ID,
         tab_name=GOOGLE_SHEETS_TAB_NAME,
-        credentials_path=CREDENTIALS_FILE,
-        token_path=TOKEN_FILE,
         range_override=GOOGLE_SHEETS_RANGE,
     )
 

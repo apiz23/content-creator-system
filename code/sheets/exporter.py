@@ -209,8 +209,6 @@ class GoogleSheetsExporter:
         # Step 3: Connect to Google Sheets
         client = GoogleSheetsClient(
             spreadsheet_id=self._config.spreadsheet_id,
-            credentials_path=self._config.credentials_path,
-            token_path=self._config.token_path,
         )
         client.connect()
 
@@ -330,8 +328,6 @@ class GoogleSheetsExporter:
         try:
             client = GoogleSheetsClient(
                 spreadsheet_id=config.spreadsheet_id,
-                credentials_path=config.credentials_path,
-                token_path=config.token_path,
             )
             client.connect()
         except Exception:

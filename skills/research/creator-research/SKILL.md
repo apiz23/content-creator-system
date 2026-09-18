@@ -1,7 +1,7 @@
 ---
 name: creator-research
 description: Use for creator discovery, scraping, and CRM management.
-version: 1.0.0
+version: 2.0.0
 author: Hafizuddin
 license: MIT
 platforms: [macos]
@@ -99,13 +99,74 @@ The Google Sheets exporter uses **incremental append only** — it never clears 
 - `code/` cannot be a Python package (stdlib `code` conflict) — use `run_sheets.py` or `sys.path.insert`
 - Never use `python -m code.sheets` — use `python3 run_sheets.py`
 
+### Google Sheets: Hermes Subprocess Adapter (NEW)
+
+This repository does NOT manage Google OAuth credentials.
+Google Sheets operations go through the existing Hermes CLI as a subprocess.
+
+- **No credentials.json or token.json** — never stored in this repository
+- **Hermes google_api.py** is invoked via `subprocess.run()` with `sheets get/append/update` commands
+- **Configuration**: `GOOGLE_SHEETS_SPREADSHEET_ID`, `GOOGLE_SHEETS_TAB_NAME`, `GOOGLE_SHEETS_RANGE` in `.env`
+- **Optional**: `HERMES_GOOGLE_API_PYTHON` and `HERMES_GOOGLE_API_SCRIPT` point to the Hermes installation on the supervisor's machine
+- **Fails clearly** if Hermes google_api.py is not found — not a silent failure
+
+```text
+Creator Research / Scraper
+          |
+          v
+    Hermes google_api.py (subprocess)
+          |
+          v
+    Hermes-managed OAuth (on supervisor's machine)
+          |
+          v
+    Google Sheets
+```
+
+See the `sheets-export` skill for full details on the Google Sheets export workflow.
+
 ### Credentials
 
-- `credentials.json` must be a valid Google OAuth 2.0 Desktop App client credential
-- `token.json` is auto-generated on first OAuth run (gitignored)
-- Do NOT commit either file
+- **This repository does NOT use credentials.json or token.json**
+- Google Sheets auth is handled by the Hermes installation on the supervisor's Mac Mini
+- On the supervisor's machine, Hermes provides: `$HERMES_HOME/google_token.json`, `$HERMES_HOME/google_client_secret.json`, `$HERMES_HOME/skills/productivity/google-workspace/scripts/google_api.py`
 
-See the `sheets-export` skill for full details on the Google Sheets export workflow, tests, and troubleshooting.
+### Re-Scrape & Safe Data Enrichment
+
+Re-scraping existing CRM creators for data enrichment (NOT replacement). Uses field-level enrichment — new valid data updates fields, empty/failed values NEVER erase existing data.
+
+Commands:
+```bash
+python3 code/scraper/run.py rescrape --source csv --limit 5 --no-sync
+python3 run_sheets.py rescrape --source csv --limit 5 --no-sync
+python3 code/scraper/run.py rescrape --source sheets --dry-run --limit 10
+```
+
+Flags: `--source`, `--limit`, `--offset`, `--dry-run`, `--no-sync`, `--model-provider`, `--model-name`
+
+### Key Re-Scrape Safety Rules
+
+1. **Immutable fields NEVER change:** ProfileURL, DiscoveredAt, Source, OutreachStatus
+2. **FollowerCount updates only if scraped value is valid/non-empty**
+3. **Tags merge (dedup) when scraped value is valid**
+4. **Language empty string when unknown — never "English"**
+5. **Failed scrapes preserve all existing data** (no empty/null/NaN/N/A overwrites)
+6. **LastScrapedAt updates only after successful scrape**
+7. **Google Sheets column-level update only** — never `batchClear`, `fullReplace`, `deleteRow`
+8. **`--no-sync` flag**: Skips Google Sheets sync entirely for controlled testing
+9. **Zero new creators → zero append writes**
+
+### Import Pattern for `code/` directory
+
+The `code/` directory is NOT a Python package. Use `sys.path.insert` for imports:
+```python
+import sys
+from pathlib import Path
+PROJECT_ROOT = Path.cwd()
+CODE_DIR = PROJECT_ROOT / "code"
+sys.path.insert(0, str(CODE_DIR))
+from scraper.run import rescrape_creators
+```
 
 ## Backup Rules
 
@@ -200,55 +261,118 @@ Before declaring any step complete, confirm:
 - **Platform casing canonical:** All platform values match canonical casing (TikTok, Facebook, Instagram, LinkedIn, Reddit, Threads, YouTube, Vimeo, Civitai)
 - **README row count updated:** If CRM changed, README.md line reflects new count
 
+## Re-Scrape & Safe Data Enrichment
+
+Re-scraping existing CRM creators for data enrichment (NOT replacement). Uses field-level enrichment — new valid data updates fields, empty/failed values NEVER erase existing data.
+
+### Commands
+
+```bash
+python3 code/scraper/run.py rescrape --source csv --limit 5 --no-sync
+python3 run_sheets.py rescrape --source csv --limit 5 --no-sync
+python3 code/scraper/run.py rescrape --source sheets --dry-run --limit 10
+```
+
+### Flags
+- `--source csv|sheets|auto` — source of re-scrape queue
+- `--limit N` — max creators to re-scrape
+- `--offset N` — offset for batching
+- `--dry-run` — preview changes without writing
+- `--no-sync` — skip Google Sheets sync after re-scrape
+- `--model-provider` / `--model-name` — AI classifier overrides
+
+### SafeEnricher — Field-Level Enrichment Rules
+
+| Field | Behavior |
+|---|---|
+| **ProfileURL** | NEVER changed — identity key |
+| **DiscoveredAt** | NEVER overwritten — preserved from first add |
+| **Source** | NEVER overwritten — preserved from first add |
+| **OutreachStatus** | NEVER overwritten — human-maintained |
+| **Email** | Only fills empty; never replaces existing |
+| **Notes** | Preserved; never overwritten with empty |
+| **FollowerCount** | Updated only if scraped value is valid/non-empty |
+| **Tags** | Merged (dedup) when scraped value is valid |
+| **Language** | Only fills empty; empty string when unknown |
+| **PrimaryAITool** | Only fills empty; never replaces existing |
+| **FeedURL** | Preserved when scraper returns empty |
+| **SampleContentURL** | Preserved when scraper returns empty |
+| **ContactSourceURL** | Preserved when scraper returns empty |
+| **EvidenceJSON** | Updated with new data; valid RFC 8259 JSON |
+| **LastScrapedAt** | Updated only after successful scrape |
+
+### Failed Scrape Safety
+
+When a scraper fails (404, timeout, bot wall):
+- The existing CRM record is FULLY preserved
+- No fields are cleared, emptied, or replaced with "N/A"
+- The failed creator is listed in the re-scrape report under "Failed creators"
+- Backup is still created before the merge attempt
+
+### Google Sheets Safety (Re-Scrape)
+
+- **New creators**: APPEND ONLY — never overwrite existing rows
+- **Existing creators**: Column-level updates only via `update_cells()` — never `batchClear`, `fullReplace`, or `deleteRow`
+- **Zero new creators**: Zero append writes
+- **`--no-sync` flag**: Skips Google Sheets sync entirely
+
+### Import Pattern for `code/` directory
+
+The `code/` directory is NOT a Python package. Use `sys.path.insert` for imports:
+```python
+import sys
+from pathlib import Path
+PROJECT_ROOT = Path.cwd()
+CODE_DIR = PROJECT_ROOT / "code"
+sys.path.insert(0, str(CODE_DIR))
+from scraper.run import rescrape_creators
+```
+
+### Helper Functions
+
+- `is_val_empty(val)` — checks None, "", "None", "N/A", "nan", float NaN
+- `_now_utc()` — current UTC ISO timestamp
+- `normalize_scraped_result(result)` — normalizes follower count, cleans UI text, resolves URLs
+- `SafeEnricher.enriches(existing_row, scraped_data, scrape_successful)` — returns (enriched_row, change_report)
+
+### Re-Scrape Testing
+
+```bash
+# Dry-run to preview changes
+python3 code/scraper/run.py rescrape --source csv --limit 5 --dry-run --no-sync
+
+# Verify invariants after re-scrape
+python3 -c "
+import pandas as pd
+crm = pd.read_csv('data/Creator-Intel-CRM-List.csv')
+assert len(crm) == 1127  # No deletions
+assert crm['ProfileURL'].duplicated().sum() == 0  # No duplicates
+assert list(crm.columns) == ['ProfileURL', 'Name/Handle', ...]  # 19 columns
+"
+```
+
+See `references/scraper-pipeline-map.md` for the complete re-scrape data flow and field mapping.
+
 ## Pitfalls
 
-- **Civitai followers**: API doesn't expose followers; fetch web page for `followerCountAllTime`
-- **Reddit blocks scraping**: Requires OAuth2; mark as `needs_manual_check`
-- **Facebook Malay UI**: Set browser to English before scraping
-- **Newlines in Notes**: Replace `\n` with spaces before CSV write
-- **Duplicate ProfileURLs**: Always dedupe case-insensitively
-- **Merge misalignment**: Ensure scraped CSV has `Name/Handle` (not `Handle`) and `ProfileURL` columns
-- **`code/` package conflict**: `code/` conflicts with Python stdlib `code` module — use `sys.path.insert(0, "code")` and import `sheets.*` directly, never `python -m code.sheets`
-- **Full-replace vs append**: The Google Sheets exporter is APPEND-ONLY. If it ever clears and rewrites the sheet, stop and fix `code/sheets/exporter.py`
-- **Google Sheets sync requires explicit user confirmation**: Never auto-export. Always ask first.
+- **YouTube yt-dlp 404s**: Some channels return 404 — failed scrapes preserve existing data, check `Failed creators` in re-scrape report
+- **`code/` is not a package**: Use `sys.path.insert(0, str(Path.cwd() / 'code'))` before importing `scraper.run`
+- **Google Sheets sync auto-runs**: `rescrape_creators()` calls `auto_sync_reshaped()` by default — use `--no-sync` to skip
+- **`run_sheets.py` argument pass-through**: Uses `parse_known_args()` to forward sub-command args — do NOT use `parse_args()` directly
+- **`FollowerCount` shows "changed" even when same**: `_enrich_follower_count` always appends change entry when value is non-empty — cosmetic in change report, does not affect data
+- **`run_sheets.py` import fix**: Must use `from scraper.run import rescrape_creators` (NOT `from code.scraper.run`) since `code/` is not a package
+- **No credentials needed**: This repo never stores `credentials.json` or `token.json`. Google Sheets uses the Hermes subprocess adapter
+- **`code/` cannot be a Python package**: The stdlib `code` module conflicts — `code/__init__.py` must NOT exist; sys.path manipulation handles imports instead
+- **`sheets-export` skill is outdated**: The `sheets-export` skill still describes the OLD OAuth-based architecture. See README.md and code/sheets/client.py for the current subprocess adapter approach
 
-## Data Safety Rules
+See `references/scraper-pipeline-map.md` for the complete field mapping and data flow
 
-1. **Master CRM = single source of truth**
-2. **Backup before every write** — abort if backup fails
-3. **Never fabricate** — use empty string when data unavailable
-4. **Always deduplicate** — check ProfileURL before adding (case-insensitive)
-5. **Preserve existing valid data** — don't overwrite with empty/null/failed results
-6. **Report partial success** — "7/10 scraped successfully"
+## Testing
 
-## Backup Files
-
-- Location: `data/backups/Creator-Intel-CRM-List_YYYYMMDD_HHMMSS.csv`
-- Timestamped, never overwritten
-- Previous backups preserved
-- Verify backup exists after creation
-
-## Example Prompts
-
-```
-"Find 5 AI creators on Instagram"
-→ web_search → creator_scrape (×5) → creator_validate
-
-"Scrape this TikTok profile: https://www.tiktok.com/@example"
-→ creator_scrape
-
-"Rescrape all existing creators"
-→ creator_batch_scrape
-
-"Refresh 10 TikTok profiles"
-→ creator_batch_scrape (platform=tiktok, limit=10)
-
-"Validate the CRM for duplicates"
-→ creator_validate
-```
-
-## Related
+- `tests/test_scraper_merge.py` — 68 tests covering merge_scraped_row(), SafeEnricher, re-scrape enrichment, field preservation
+- `tests/test_sheets.py` — 65 tests covering subprocess adapter, config validation, incremental append, clean_cell_value, EvidenceJSON, Unicode, backup
+- Run: `python3 -m pytest tests/ -v` (133 total: 65 sheets + 68 merge)
 
 - `cronjob` skill for scheduled scraping
 - `web` skill for page extraction
-- `sheets-export` skill for Google Sheets export
+- `sheets-export` skill for Google Sheets export workflow

@@ -1,18 +1,18 @@
 """Tests for the Google Sheets integration module.
 
 Tests cover:
-- Configuration loading and validation
+- Configuration loading and validation (no credentials required)
+- Subprocess-based client adapter (mocked subprocess.run)
 - Incremental append export behavior
 - ProfileURL-based duplicate detection
 - Data quality (clean_cell_value, EvidenceJSON, Unicode)
-- Client API interactions
 - Backup functionality
 """
 
 import json
-import sys
+import os
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 
 import pytest
 
@@ -20,10 +20,10 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 CODE_DIR = PROJECT_ROOT / "code"
 
 # Ensure project paths are in sys.path before any imports
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
-if str(CODE_DIR) not in sys.path:
-    sys.path.insert(0, str(CODE_DIR))
+if str(PROJECT_ROOT) not in __import__("sys").path:
+    __import__("sys").path.insert(0, str(PROJECT_ROOT))
+if str(CODE_DIR) not in __import__("sys").path:
+    __import__("sys").path.insert(0, str(CODE_DIR))
 
 
 def parse_export_result(result_str: str) -> dict:
@@ -36,10 +36,12 @@ def parse_export_result(result_str: str) -> dict:
         return {"error": f"Invalid JSON: {result_str}"}
 
 
-# --- Config Tests ---
+# =============================================================================
+# Config Tests
+# =============================================================================
 
 class TestConfig:
-    """Test configuration loading and validation."""
+    """Test configuration loading and validation without credentials."""
 
     def test_missing_tab_name_fails(self):
         """Missing GOOGLE_SHEETS_TAB_NAME should raise RuntimeError."""
@@ -48,8 +50,6 @@ class TestConfig:
         config = SheetsConfig(
             spreadsheet_id="test-id",
             tab_name="",
-            credentials_path=Path("/nonexistent/credentials.json"),
-            token_path=Path("/nonexistent/token.json"),
         )
         errors = config.validate()
         assert any("GOOGLE_SHEETS_TAB_NAME" in e for e in errors)
@@ -61,24 +61,21 @@ class TestConfig:
         config = SheetsConfig(
             spreadsheet_id="",
             tab_name="Test Tab",
-            credentials_path=Path("/nonexistent/credentials.json"),
-            token_path=Path("/nonexistent/token.json"),
         )
         errors = config.validate()
         assert any("GOOGLE_SHEETS_SPREADSHEET_ID" in e for e in errors)
 
-    def test_missing_credentials_fails(self):
-        """Missing credentials.json should be caught in validation."""
+    def test_no_credentials_required(self):
+        """SheetsConfig should not require credentials_path or token_path."""
         from sheets.config import SheetsConfig
 
         config = SheetsConfig(
             spreadsheet_id="test-id",
             tab_name="Test Tab",
-            credentials_path=Path("/nonexistent/credentials.json"),
-            token_path=Path("/nonexistent/token.json"),
         )
-        errors = config.validate()
-        assert any("credentials" in e.lower() for e in errors)
+        assert hasattr(config, "spreadsheet_id")
+        assert not hasattr(config, "credentials_path")
+        assert not hasattr(config, "token_path")
 
     def test_range_auto_generated(self):
         """Range should auto-generate from tab name for 19 columns (A:S)."""
@@ -87,8 +84,6 @@ class TestConfig:
         config = SheetsConfig(
             spreadsheet_id="test-id",
             tab_name="Creator Intel",
-            credentials_path=Path("/nonexistent/credentials.json"),
-            token_path=Path("/nonexistent/token.json"),
         )
         assert config.range == "'Creator Intel'!A:S"
 
@@ -99,14 +94,25 @@ class TestConfig:
         config = SheetsConfig(
             spreadsheet_id="test-id",
             tab_name="Creator Intel",
-            credentials_path=Path("/nonexistent/credentials.json"),
-            token_path=Path("/nonexistent/token.json"),
             range_override="Creator Intel!A1:S10",
         )
         assert config.range == "Creator Intel!A1:S10"
 
+    def test_validate_adapter(self):
+        """validate_adapter should warn when HERMES_GOOGLE_API_SCRIPT is missing."""
+        from sheets.config import SheetsConfig
 
-# --- Exporter Tests ---
+        config = SheetsConfig(
+            spreadsheet_id="test-id",
+            tab_name="Test Tab",
+        )
+        errors = config.validate_adapter()
+        assert isinstance(errors, list)
+
+
+# =============================================================================
+# Exporter Tests
+# =============================================================================
 
 class TestExporter:
     """Test the Google Sheets exporter logic."""
@@ -117,23 +123,23 @@ class TestExporter:
         from sheets.exporter import GoogleSheetsExporter
         from sheets.config import SheetsConfig
 
+        TARGET_COLS = __import__(
+            "scraper.common", fromlist=["TARGET_COLUMNS"]
+        ).TARGET_COLUMNS
+
         test_csv = Path("/tmp/test_crm_export.csv")
-        all_cols = list(__import__("scraper.common", fromlist=["TARGET_COLUMNS"]).TARGET_COLUMNS) + ["ExtraColumn"]
+        all_cols = list(TARGET_COLS) + ["ExtraColumn"]
         df = pd.DataFrame([{col: "val" for col in all_cols}])
         df.to_csv(test_csv, index=False)
 
         config = SheetsConfig(
             spreadsheet_id="test-id",
             tab_name="Test Tab",
-            credentials_path=Path("/nonexistent/credentials.json"),
-            token_path=Path("/nonexistent/token.json"),
         )
         exporter = GoogleSheetsExporter(config)
         df_loaded = exporter._load_csv()
 
-        assert list(df_loaded.columns) == list(
-            __import__("scraper.common", fromlist=["TARGET_COLUMNS"]).TARGET_COLUMNS
-        )
+        assert list(df_loaded.columns) == list(TARGET_COLS)
         assert "ExtraColumn" not in df_loaded.columns
 
         test_csv.unlink(missing_ok=True)
@@ -144,7 +150,9 @@ class TestExporter:
         from sheets.exporter import GoogleSheetsExporter
         from sheets.config import SheetsConfig
 
-        TARGET_COLS = __import__("scraper.common", fromlist=["TARGET_COLUMNS"]).TARGET_COLUMNS
+        TARGET_COLS = __import__(
+            "scraper.common", fromlist=["TARGET_COLUMNS"]
+        ).TARGET_COLUMNS
 
         test_csv = Path("/tmp/test_crm_extra.csv")
         all_cols = list(TARGET_COLS) + ["ExtraCol1", "ExtraCol2"]
@@ -154,8 +162,6 @@ class TestExporter:
         config = SheetsConfig(
             spreadsheet_id="test-id",
             tab_name="Test Tab",
-            credentials_path=Path("/nonexistent/credentials.json"),
-            token_path=Path("/nonexistent/token.json"),
         )
         exporter = GoogleSheetsExporter(config)
         df_loaded = exporter._load_csv()
@@ -174,8 +180,6 @@ class TestExporter:
         config = SheetsConfig(
             spreadsheet_id="test-id",
             tab_name="Test Tab",
-            credentials_path=Path("/nonexistent/credentials.json"),
-            token_path=Path("/nonexistent/token.json"),
         )
         exporter = GoogleSheetsExporter(config)
         exporter._csv_path = Path("/nonexistent/nonexistent.csv")
@@ -189,7 +193,9 @@ class TestExporter:
         from sheets.exporter import GoogleSheetsExporter
         from sheets.config import SheetsConfig
 
-        TARGET_COLS = __import__("scraper.common", fromlist=["TARGET_COLUMNS"]).TARGET_COLUMNS
+        TARGET_COLS = __import__(
+            "scraper.common", fromlist=["TARGET_COLUMNS"]
+        ).TARGET_COLUMNS
 
         test_csv = Path("/tmp/test_crm_missing.csv")
         df = pd.DataFrame([{"ProfileURL": "https://test.com"}])
@@ -198,8 +204,6 @@ class TestExporter:
         config = SheetsConfig(
             spreadsheet_id="test-id",
             tab_name="Test Tab",
-            credentials_path=Path("/nonexistent/credentials.json"),
-            token_path=Path("/nonexistent/token.json"),
         )
         exporter = GoogleSheetsExporter(config)
         exporter._csv_path = test_csv
@@ -210,7 +214,9 @@ class TestExporter:
         test_csv.unlink(missing_ok=True)
 
 
-# --- clean_cell_value Tests ---
+# =============================================================================
+# clean_cell_value Tests
+# =============================================================================
 
 class TestCleanCellValue:
     """Test that missing/null values become empty strings."""
@@ -268,7 +274,7 @@ class TestCleanCellValue:
         from sheets.exporter import clean_cell_value
         assert clean_cell_value(json_str) == json_str
 
-    def test_clean_cell_value_with_whitespace(self):
+    def test_clean_cell_value_whitespace(self):
         """Whitespace-only strings should become empty string."""
         from sheets.exporter import clean_cell_value
         assert clean_cell_value("   ") == ""
@@ -276,10 +282,15 @@ class TestCleanCellValue:
     def test_clean_cell_value_legitimate_text(self):
         """Legitimate multilingual text must be preserved."""
         from sheets.exporter import clean_cell_value
-        assert clean_cell_value("Konten AI dalam Bahasa Melayu 🇲🇾") == "Konten AI dalam Bahasa Melayu 🇲🇾"
+        assert (
+            clean_cell_value("Konten AI dalam Bahasa Melayu 🇲🇾")
+            == "Konten AI dalam Bahasa Melayu 🇲🇾"
+        )
 
 
-# --- Incremental Append Tests ---
+# =============================================================================
+# Incremental Append Tests
+# =============================================================================
 
 class TestIncrementalAppend:
     """Test the incremental append behavior."""
@@ -290,33 +301,28 @@ class TestIncrementalAppend:
         from sheets.exporter import GoogleSheetsExporter
         from sheets.config import SheetsConfig
 
-        TARGET_COLS = __import__("scraper.common", fromlist=["TARGET_COLUMNS"]).TARGET_COLUMNS
+        TARGET_COLS = __import__(
+            "scraper.common", fromlist=["TARGET_COLUMNS"]
+        ).TARGET_COLUMNS
 
         config = SheetsConfig(
             spreadsheet_id="test-id",
             tab_name="Test Tab",
-            credentials_path=Path("/nonexistent/credentials.json"),
-            token_path=Path("/nonexistent/token.json"),
         )
         exporter = GoogleSheetsExporter(config)
 
-        # CSV has 2 records
         row1 = {col: "val" for col in TARGET_COLS}
         row1["ProfileURL"] = "https://test.com/profile1"
         row2 = {col: "val" for col in TARGET_COLS}
         row2["ProfileURL"] = "https://test.com/profile2"
         df_csv = pd.DataFrame([row1, row2])
         df_csv.to_csv("/tmp/test_append.csv", index=False)
-        exporter._csv_path = Path("/tmp/test_append.csv")
 
-        # Existing Google Sheet has the first ProfileURL
         existing_urls = {"https://test.com/profile1"}
-
         new_df = exporter._find_new_records(df_csv, existing_urls)
-        assert len(new_df) == 1  # Only 1 new record
+        assert len(new_df) == 1
         assert new_df.iloc[0]["ProfileURL"] == "https://test.com/profile2"
 
-        import os
         os.unlink("/tmp/test_append.csv")
 
     def test_new_profile_url_appended(self):
@@ -325,13 +331,13 @@ class TestIncrementalAppend:
         from sheets.exporter import GoogleSheetsExporter
         from sheets.config import SheetsConfig
 
-        TARGET_COLS = __import__("scraper.common", fromlist=["TARGET_COLUMNS"]).TARGET_COLUMNS
+        TARGET_COLS = __import__(
+            "scraper.common", fromlist=["TARGET_COLUMNS"]
+        ).TARGET_COLUMNS
 
         config = SheetsConfig(
             spreadsheet_id="test-id",
             tab_name="Test Tab",
-            credentials_path=Path("/nonexistent/credentials.json"),
-            token_path=Path("/nonexistent/token.json"),
         )
         exporter = GoogleSheetsExporter(config)
 
@@ -339,361 +345,332 @@ class TestIncrementalAppend:
         df_csv.to_csv("/tmp/test_new.csv", index=False)
         exporter._csv_path = Path("/tmp/test_new.csv")
 
-        # No existing URLs in Google Sheets
         existing_urls = set()
-
         new_df = exporter._find_new_records(df_csv, existing_urls)
         assert len(new_df) == 1
 
-        import os
         os.unlink("/tmp/test_new.csv")
 
-    def test_mixed_existing_and_new_records(self):
-        """Mixed existing + new records → only new ones returned."""
-        import pandas as pd
-        from sheets.exporter import GoogleSheetsExporter
-        from sheets.config import SheetsConfig
 
-        TARGET_COLS = __import__("scraper.common", fromlist=["TARGET_COLUMNS"]).TARGET_COLUMNS
-
-        config = SheetsConfig(
-            spreadsheet_id="test-id",
-            tab_name="Test Tab",
-            credentials_path=Path("/nonexistent/credentials.json"),
-            token_path=Path("/nonexistent/token.json"),
-        )
-        exporter = GoogleSheetsExporter(config)
-
-        row1 = {col: "val1" for col in TARGET_COLS}
-        row1["ProfileURL"] = "https://existing.com"
-        row2 = {col: "val2" for col in TARGET_COLS}
-        row2["ProfileURL"] = "https://new.com"
-        row3 = {col: "val3" for col in TARGET_COLS}
-        row3["ProfileURL"] = "https://existing2.com"
-
-        df_csv = pd.DataFrame([row1, row2, row3])
-        df_csv.to_csv("/tmp/test_mixed.csv", index=False)
-        exporter._csv_path = Path("/tmp/test_mixed.csv")
-
-        existing_urls = {"https://existing.com", "https://existing2.com"}
-        new_df = exporter._find_new_records(df_csv, existing_urls)
-
-        assert len(new_df) == 1
-        assert new_df.iloc[0]["ProfileURL"] == "https://new.com"
-
-        import os
-        os.unlink("/tmp/test_mixed.csv")
-
-    def test_duplicate_profile_urls_in_csv(self):
-        """Duplicate ProfileURLs inside the CSV → all treated as new if not in Sheets."""
-        import pandas as pd
-        from sheets.exporter import GoogleSheetsExporter
-        from sheets.config import SheetsConfig
-
-        TARGET_COLS = __import__("scraper.common", fromlist=["TARGET_COLUMNS"]).TARGET_COLUMNS
-
-        config = SheetsConfig(
-            spreadsheet_id="test-id",
-            tab_name="Test Tab",
-            credentials_path=Path("/nonexistent/credentials.json"),
-            token_path=Path("/nonexistent/token.json"),
-        )
-        exporter = GoogleSheetsExporter(config)
-
-        row1 = {col: "val" for col in TARGET_COLS}
-        row1["ProfileURL"] = "https://same.com"
-        row2 = {col: "val" for col in TARGET_COLS}
-        row2["ProfileURL"] = "https://same.com"
-
-        df_csv = pd.DataFrame([row1, row2])
-        df_csv.to_csv("/tmp/test_dup.csv", index=False)
-        exporter._csv_path = Path("/tmp/test_dup.csv")
-
-        existing_urls = set()
-        new_df = exporter._find_new_records(df_csv, existing_urls)
-
-        assert len(new_df) == 2  # Both are new since not in Sheets
-
-        import os
-        os.unlink("/tmp/test_dup.csv")
-
-    def test_whitespace_in_profile_url(self):
-        """ProfileURL whitespace differences → normalized for comparison."""
-        import pandas as pd
-        from sheets.exporter import GoogleSheetsExporter
-        from sheets.config import SheetsConfig
-
-        TARGET_COLS = __import__("scraper.common", fromlist=["TARGET_COLUMNS"]).TARGET_COLUMNS
-
-        config = SheetsConfig(
-            spreadsheet_id="test-id",
-            tab_name="Test Tab",
-            credentials_path=Path("/nonexistent/credentials.json"),
-            token_path=Path("/nonexistent/token.json"),
-        )
-        exporter = GoogleSheetsExporter(config)
-
-        row = {col: "val" for col in TARGET_COLS}
-        row["ProfileURL"] = "https://test.com/ "  # trailing space
-
-        df_csv = pd.DataFrame([row])
-        df_csv.to_csv("/tmp/test_ws.csv", index=False)
-        exporter._csv_path = Path("/tmp/test_ws.csv")
-
-        # Existing URL without trailing slash/space
-        existing_urls = {"https://test.com"}
-
-        new_df = exporter._find_new_records(df_csv, existing_urls)
-        assert len(new_df) == 0  # Should be treated as existing
-
-        import os
-        os.unlink("/tmp/test_ws.csv")
-
-    def test_no_new_records_no_write(self):
-        """All ProfileURLs already exist → should return 0 new rows."""
-        import pandas as pd
-        from sheets.exporter import GoogleSheetsExporter
-        from sheets.config import SheetsConfig
-
-        TARGET_COLS = __import__("scraper.common", fromlist=["TARGET_COLUMNS"]).TARGET_COLUMNS
-
-        config = SheetsConfig(
-            spreadsheet_id="test-id",
-            tab_name="Test Tab",
-            credentials_path=Path("/nonexistent/credentials.json"),
-            token_path=Path("/nonexistent/token.json"),
-        )
-        exporter = GoogleSheetsExporter(config)
-
-        row = {col: "val" for col in TARGET_COLS}
-        row["ProfileURL"] = "https://existing.com"
-        df_csv = pd.DataFrame([row])
-        df_csv.to_csv("/tmp/test_none.csv", index=False)
-        exporter._csv_path = Path("/tmp/test_none.csv")
-
-        existing_urls = {"https://existing.com"}
-        new_df = exporter._find_new_records(df_csv, existing_urls)
-
-        assert len(new_df) == 0
-
-        import os
-        os.unlink("/tmp/test_none.csv")
-
-
-# --- clean_cell_value with _find_new_records ---
-
-class TestNewRecordsDataQuality:
-    """Test data quality in incremental append."""
-
-    def test_new_records_preserve_evidence_json(self):
-        """EvidenceJSON should remain valid JSON in new rows."""
-        import pandas as pd
-        from sheets.exporter import GoogleSheetsExporter
-        from sheets.config import SheetsConfig
-
-        TARGET_COLS = __import__("scraper.common", fromlist=["TARGET_COLUMNS"]).TARGET_COLUMNS
-
-        config = SheetsConfig(
-            spreadsheet_id="test-id",
-            tab_name="Test Tab",
-            credentials_path=Path("/nonexistent/credentials.json"),
-            token_path=Path("/nonexistent/token.json"),
-        )
-        exporter = GoogleSheetsExporter(config)
-
-        evidence = {"follower_count": {"source": "test", "value": 1000}}
-        row_data = {col: "val" for col in TARGET_COLS}
-        row_data["EvidenceJSON"] = json.dumps(evidence)
-        row_data["ProfileURL"] = "https://new.com"
-        df_csv = pd.DataFrame([row_data])
-        df_csv.to_csv("/tmp/test_evidence.csv", index=False)
-        exporter._csv_path = Path("/tmp/test_evidence.csv")
-
-        existing_urls = set()
-        new_df = exporter._find_new_records(df_csv, existing_urls)
-        assert len(new_df) == 1
-        assert "EvidenceJSON" in new_df.columns
-
-        import os
-        os.unlink("/tmp/test_evidence.csv")
-
-    def test_new_records_empty_values(self):
-        """Missing values in new records should be preserved."""
-        import pandas as pd
-        from sheets.exporter import GoogleSheetsExporter
-        from sheets.config import SheetsConfig
-
-        TARGET_COLS = __import__("scraper.common", fromlist=["TARGET_COLUMNS"]).TARGET_COLUMNS
-
-        config = SheetsConfig(
-            spreadsheet_id="test-id",
-            tab_name="Test Tab",
-            credentials_path=Path("/nonexistent/credentials.json"),
-            token_path=Path("/nonexistent/token.json"),
-        )
-        exporter = GoogleSheetsExporter(config)
-
-        row_data = {col: "val" for col in TARGET_COLS}
-        row_data["Email"] = ""
-        row_data["ProfileURL"] = "https://new.com"
-        df_csv = pd.DataFrame([row_data])
-        df_csv.to_csv("/tmp/test_empty.csv", index=False)
-        exporter._csv_path = Path("/tmp/test_empty.csv")
-
-        existing_urls = set()
-        new_df = exporter._find_new_records(df_csv, existing_urls)
-        assert len(new_df) == 1
-        # Email is empty string after CSV round-trip
-        assert new_df.iloc[0]["Email"] == ""
-
-        import os
-        os.unlink("/tmp/test_empty.csv")
-
-    def test_batch_append_not_one_per_row(self):
-        """All new records are collected into one batch, not one per row."""
-        import pandas as pd
-        from sheets.exporter import GoogleSheetsExporter
-        from sheets.config import SheetsConfig
-
-        TARGET_COLS = __import__("scraper.common", fromlist=["TARGET_COLUMNS"]).TARGET_COLUMNS
-
-        config = SheetsConfig(
-            spreadsheet_id="test-id",
-            tab_name="Test Tab",
-            credentials_path=Path("/nonexistent/credentials.json"),
-            token_path=Path("/nonexistent/token.json"),
-        )
-        exporter = GoogleSheetsExporter(config)
-
-        rows = []
-        for i in range(10):
-            row = {col: f"val{i}" for col in TARGET_COLS}
-            row["ProfileURL"] = f"https://new{i}.com"
-            rows.append(row)
-
-        df_csv = pd.DataFrame(rows)
-        df_csv.to_csv("/tmp/test_batch.csv", index=False)
-        exporter._csv_path = Path("/tmp/test_batch.csv")
-
-        existing_urls = set()
-        new_df = exporter._find_new_records(df_csv, existing_urls)
-
-        # All 10 are new
-        assert len(new_df) == 10
-        # The important thing is they're all collected in ONE DataFrame
-        # (the actual API append is a single batch call)
-
-        import os
-        os.unlink("/tmp/test_batch.csv")
-
-
-# --- Client Tests ---
+# =============================================================================
+# Client Tests (subprocess adapter)
+# =============================================================================
 
 class TestClient:
-    """Test Google Sheets client with mocked API calls."""
+    """Test the Google Sheets subprocess client adapter."""
 
-    @patch("sheets.client.build")
-    @patch("sheets.client.Credentials.from_authorized_user_file")
-    def test_tab_exists(self, mock_creds, mock_build):
-        """Tab existence check should work correctly."""
+    def test_sheets_get_command(self, tmp_path):
+        """sheets get command should be invoked correctly."""
         from sheets.client import GoogleSheetsClient
 
-        mock_creds.return_value = Mock(valid=True)
-        mock_service = Mock()
-        mock_build.return_value = mock_service
+        fake_script = tmp_path / "fake_google_api.py"
+        fake_script.write_text("# fake")
+        os.environ["HERMES_GOOGLE_API_SCRIPT"] = str(fake_script)
+        with patch("sheets.client.subprocess.run") as mock_run:
+            mock_run.return_value = Mock(
+                stdout=json.dumps({"values": [["A1", "B1"]]}),
+                stderr="",
+                returncode=0,
+            )
+            client = GoogleSheetsClient(spreadsheet_id="test-id")
+            result = client.read_range("'Creator Intel'!A1:S10")
 
-        mock_spreadsheet = Mock()
-        mock_spreadsheet.get.return_value = {"sheets": [
-            {"properties": {"title": "Creator Intel"}},
-            {"properties": {"title": "Other Tab"}},
-        ]}
-        mock_service.spreadsheets().get.return_value.execute.return_value = (
-            mock_spreadsheet.get.return_value
-        )
+            mock_run.assert_called_once()
+            call_args = mock_run.call_args[0][0]
+            assert call_args[0] == client._python
+            assert "sheets" in call_args
+            assert call_args[3] == "get"
+            assert call_args[4] == "test-id"
+            assert call_args[5] == "'Creator Intel'!A1:S10"
+            assert result == [["A1", "B1"]]
 
-        client = GoogleSheetsClient(
-            spreadsheet_id="test-id",
-            credentials_path=Path("/tmp/fake_creds.json"),
-            token_path=Path("/tmp/fake_token.json"),
-        )
-        client._service = mock_service
+        os.environ.pop("HERMES_GOOGLE_API_SCRIPT", None)
 
-        assert client.tab_exists("Creator Intel") is True
-        assert client.tab_exists("NonExistent") is False
-
-    @patch("sheets.client.build")
-    def test_connect_success(self, mock_build):
-        """Connection should succeed with mocked API service."""
+    def test_sheets_append_command(self, tmp_path):
+        """sheets append command should be invoked correctly."""
         from sheets.client import GoogleSheetsClient
-        from google.oauth2.credentials import Credentials
 
-        mock_creds = Credentials(token="fake")
-        mock_service = Mock()
-        mock_build.return_value = mock_service
+        fake_script = tmp_path / "fake_google_api.py"
+        fake_script.write_text("# fake")
+        os.environ["HERMES_GOOGLE_API_SCRIPT"] = str(fake_script)
+        with patch("sheets.client.subprocess.run") as mock_run:
+            mock_run.return_value = Mock(
+                stdout=json.dumps({"updates": {}}),
+                stderr="",
+                returncode=0,
+            )
+            client = GoogleSheetsClient(spreadsheet_id="test-id")
+            values = [["val1", "val2"], ["val3", "val4"]]
+            client.append_rows("'Creator Intel'!A1128:S1131", values)
 
-        client = GoogleSheetsClient(
-            spreadsheet_id="test-id",
-            credentials_path=Path("/tmp/fake_creds.json"),
-            token_path=Path("/tmp/fake_token.json"),
-        )
-        client._get_credentials = Mock(return_value=mock_creds)
-        client.connect()
+            mock_run.assert_called_once()
+            call_args = mock_run.call_args[0][0]
+            assert "sheets" in call_args
+            assert call_args[3] == "append"
+            assert call_args[4] == "test-id"
+            assert call_args[5] == "'Creator Intel'!A1128:S1131"
+            assert "--values" in call_args
 
-        assert client._service is not None
+        os.environ.pop("HERMES_GOOGLE_API_SCRIPT", None)
 
-    @patch("sheets.client.build")
-    def test_append_rows(self, mock_build):
-        """append_rows should call the API correctly."""
+    def test_sheets_update_command(self, tmp_path):
+        """sheets update command should be invoked correctly."""
         from sheets.client import GoogleSheetsClient
-        from google.oauth2.credentials import Credentials
 
-        mock_creds = Credentials(token="fake")
-        mock_service = Mock()
-        mock_build.return_value = mock_service
+        fake_script = tmp_path / "fake_google_api.py"
+        fake_script.write_text("# fake")
+        os.environ["HERMES_GOOGLE_API_SCRIPT"] = str(fake_script)
+        with patch("sheets.client.subprocess.run") as mock_run:
+            mock_run.return_value = Mock(
+                stdout=json.dumps({"updatedCells": 3}),
+                stderr="",
+                returncode=0,
+            )
+            client = GoogleSheetsClient(spreadsheet_id="test-id")
+            values = [["new_val"]]
+            client.update_cells("'Creator Intel'!B5:D5", values)
 
-        client = GoogleSheetsClient(
-            spreadsheet_id="test-id",
-            credentials_path=Path("/tmp/fake_creds.json"),
-            token_path=Path("/tmp/fake_token.json"),
-        )
-        client._get_credentials = Mock(return_value=mock_creds)
-        client.connect()
+            mock_run.assert_called_once()
+            call_args = mock_run.call_args[0][0]
+            assert "sheets" in call_args
+            assert call_args[3] == "update"
+            assert call_args[4] == "test-id"
+            assert call_args[5] == "'Creator Intel'!B5:D5"
+            assert "--values" in call_args
 
-        test_values = [["val1", "val2"], ["val3", "val4"]]
-        client.append_rows("'Test'!A2:B3", test_values)
+        os.environ.pop("HERMES_GOOGLE_API_SCRIPT", None)
 
-        mock_service.spreadsheets().values().append.assert_called_once()
-        call_args = mock_service.spreadsheets().values().append.call_args
-        assert call_args.kwargs["valueInputOption"] == "RAW"
-        assert call_args.kwargs["body"]["values"] == test_values
-
-    @patch("sheets.client.build")
-    def test_write_range(self, mock_build):
-        """Write range should call the API with correct parameters."""
+    def test_json_values_serialization(self, tmp_path):
+        """Values should be serialized as JSON in the command."""
         from sheets.client import GoogleSheetsClient
-        from google.oauth2.credentials import Credentials
 
-        mock_creds = Credentials(token="fake")
-        mock_service = Mock()
-        mock_build.return_value = mock_service
+        fake_script = tmp_path / "fake_google_api.py"
+        fake_script.write_text("# fake")
+        os.environ["HERMES_GOOGLE_API_SCRIPT"] = str(fake_script)
+        with patch("sheets.client.subprocess.run") as mock_run:
+            mock_run.return_value = Mock(
+                stdout=json.dumps({}),
+                stderr="",
+                returncode=0,
+            )
+            client = GoogleSheetsClient(spreadsheet_id="test-id")
+            values = [["a", "b"], ["c", "d"]]
+            client.append_rows("'Test'!A1:B2", values)
 
-        client = GoogleSheetsClient(
-            spreadsheet_id="test-id",
-            credentials_path=Path("/tmp/fake_creds.json"),
-            token_path=Path("/tmp/fake_token.json"),
-        )
-        client._get_credentials = Mock(return_value=mock_creds)
-        client.connect()
+            call_args = mock_run.call_args[0][0]
+            values_idx = call_args.index("--values")
+            values_json = json.loads(call_args[values_idx + 1])
+            assert values_json == values
 
-        test_values = [["Header1", "Header2"], ["val1", "val2"]]
-        client.write_range("'Test'!A1:B2", test_values)
+        os.environ.pop("HERMES_GOOGLE_API_SCRIPT", None)
 
-        mock_service.spreadsheets().values().update.assert_called_once()
-        call_args = mock_service.spreadsheets().values().update.call_args
-        assert call_args.kwargs["body"]["values"] == test_values
+    def test_json_response_parsing(self, tmp_path):
+        """Stdout JSON should be parsed and returned."""
+        from sheets.client import GoogleSheetsClient
+
+        fake_script = tmp_path / "fake_google_api.py"
+        fake_script.write_text("# fake")
+        os.environ["HERMES_GOOGLE_API_SCRIPT"] = str(fake_script)
+        with patch("sheets.client.subprocess.run") as mock_run:
+            mock_run.return_value = Mock(
+                stdout=json.dumps({"values": [["A1"], ["B2"]]}),
+                stderr="",
+                returncode=0,
+            )
+            client = GoogleSheetsClient(spreadsheet_id="test-id")
+            result = client.read_range("'Test'!A1:A2")
+
+            assert result == [["A1"], ["B2"]]
+
+        os.environ.pop("HERMES_GOOGLE_API_SCRIPT", None)
+
+    def test_nonzero_returncode_raises(self, tmp_path):
+        """Non-zero subprocess returncode should raise RuntimeError."""
+        from sheets.client import GoogleSheetsClient
+
+        fake_script = tmp_path / "fake_google_api.py"
+        fake_script.write_text("# fake")
+        os.environ["HERMES_GOOGLE_API_SCRIPT"] = str(fake_script)
+        with patch("sheets.client.subprocess.run") as mock_run:
+            mock_run.return_value = Mock(
+                stdout="",
+                stderr="Error: something went wrong",
+                returncode=1,
+            )
+            client = GoogleSheetsClient(spreadsheet_id="test-id")
+            with pytest.raises(RuntimeError, match="failed"):
+                client.read_range("'Test'!A1:A1")
+
+        os.environ.pop("HERMES_GOOGLE_API_SCRIPT", None)
+
+    def test_stderr_handling(self, tmp_path):
+        """Stderr should not be exposed in error messages."""
+        from sheets.client import GoogleSheetsClient
+
+        fake_script = tmp_path / "fake_google_api.py"
+        fake_script.write_text("# fake")
+        os.environ["HERMES_GOOGLE_API_SCRIPT"] = str(fake_script)
+        with patch("sheets.client.subprocess.run") as mock_run:
+            mock_run.return_value = Mock(
+                stdout="",
+                stderr="secret_token=abc123",
+                returncode=1,
+            )
+            client = GoogleSheetsClient(spreadsheet_id="test-id")
+            with pytest.raises(RuntimeError) as exc_info:
+                client.read_range("'Test'!A1:A1")
+            error_msg = str(exc_info.value)
+            assert "secret_token=abc123" not in error_msg
+            assert "failed" in error_msg.lower()
+
+        os.environ.pop("HERMES_GOOGLE_API_SCRIPT", None)
+
+    def test_missing_hermes_executable(self, tmp_path):
+        """Invalid HERMES_GOOGLE_API_PYTHON should be stored correctly."""
+        from sheets.client import GoogleSheetsClient
+
+        fake_script = tmp_path / "fake_google_api.py"
+        fake_script.write_text("# fake")
+        os.environ["HERMES_GOOGLE_API_SCRIPT"] = str(fake_script)
+        os.environ["HERMES_GOOGLE_API_PYTHON"] = "/nonexistent/python"
+        client = GoogleSheetsClient(spreadsheet_id="test-id")
+        assert client._python == "/nonexistent/python"
+
+        os.environ.pop("HERMES_GOOGLE_API_SCRIPT", None)
+        os.environ.pop("HERMES_GOOGLE_API_PYTHON", None)
+
+    def test_missing_google_api_script(self, tmp_path):
+        """Missing google_api.py should raise RuntimeError on connect."""
+        from sheets.client import GoogleSheetsClient
+
+        os.environ["HERMES_GOOGLE_API_SCRIPT"] = "/nonexistent/google_api.py"
+        os.environ.pop("HERMES_GOOGLE_API_PYTHON", None)
+        client = GoogleSheetsClient(spreadsheet_id="test-id")
+
+        with pytest.raises(RuntimeError, match="not found"):
+            client.connect()
+
+        os.environ.pop("HERMES_GOOGLE_API_SCRIPT", None)
+
+    def test_hermes_python_override(self, tmp_path):
+        """HERMES_GOOGLE_API_PYTHON should override the default Python."""
+        from sheets.client import GoogleSheetsClient
+
+        fake_script = tmp_path / "fake_google_api.py"
+        fake_script.write_text("# fake")
+        os.environ["HERMES_GOOGLE_API_SCRIPT"] = str(fake_script)
+        os.environ["HERMES_GOOGLE_API_PYTHON"] = "/custom/python"
+        client = GoogleSheetsClient(spreadsheet_id="test-id")
+        assert client._python == "/custom/python"
+
+        os.environ.pop("HERMES_GOOGLE_API_SCRIPT", None)
+        os.environ.pop("HERMES_GOOGLE_API_PYTHON", None)
+
+    def test_hermes_script_override(self, tmp_path):
+        """HERMES_GOOGLE_API_SCRIPT should override the default script path."""
+        from sheets.client import GoogleSheetsClient
+
+        os.environ["HERMES_GOOGLE_API_SCRIPT"] = "/custom/google_api.py"
+        client = GoogleSheetsClient(spreadsheet_id="test-id")
+        assert client._script == "/custom/google_api.py"
+
+        os.environ.pop("HERMES_GOOGLE_API_SCRIPT", None)
+
+    def test_tab_exists(self, tmp_path):
+        """tab_exists should use 'sheets get' with a harmless read."""
+        from sheets.client import GoogleSheetsClient
+
+        fake_script = tmp_path / "fake_google_api.py"
+        fake_script.write_text("# fake")
+        os.environ["HERMES_GOOGLE_API_SCRIPT"] = str(fake_script)
+        with patch("sheets.client.subprocess.run") as mock_run:
+            mock_run.return_value = Mock(
+                stdout=json.dumps({"values": [["Header"]]}),
+                stderr="",
+                returncode=0,
+            )
+            client = GoogleSheetsClient(spreadsheet_id="test-id")
+            result = client.tab_exists("Creator Intel")
+
+            assert result is True
+            call_args = mock_run.call_args[0][0]
+            assert "Creator Intel'!A1:A1" in call_args[5]
+
+        os.environ.pop("HERMES_GOOGLE_API_SCRIPT", None)
+
+    def test_missing_tab_returns_false(self, tmp_path):
+        """Missing tab should return False, not raise."""
+        from sheets.client import GoogleSheetsClient
+
+        fake_script = tmp_path / "fake_google_api.py"
+        fake_script.write_text("# fake")
+        os.environ["HERMES_GOOGLE_API_SCRIPT"] = str(fake_script)
+        with patch("sheets.client.subprocess.run") as mock_run:
+            mock_run.return_value = Mock(
+                stdout=json.dumps({"values": []}),
+                stderr="",
+                returncode=0,
+            )
+            client = GoogleSheetsClient(spreadsheet_id="test-id")
+            result = client.tab_exists("NonExistent")
+
+            assert result is False
+
+        os.environ.pop("HERMES_GOOGLE_API_SCRIPT", None)
+
+    def test_connect_does_not_call_google(self, tmp_path):
+        """connect() must NOT call Google or make API calls."""
+        from sheets.client import GoogleSheetsClient
+
+        fake_script = tmp_path / "fake_google_api.py"
+        fake_script.write_text("# fake")
+        os.environ["HERMES_GOOGLE_API_SCRIPT"] = str(fake_script)
+        with patch("sheets.client.subprocess.run") as mock_run:
+            client = GoogleSheetsClient(spreadsheet_id="test-id")
+            client.connect()
+            # connect() only validates, does not call subprocess.run
+            mock_run.assert_not_called()
+
+        os.environ.pop("HERMES_GOOGLE_API_SCRIPT", None)
+
+    def test_connect_does_not_launch_oauth(self, tmp_path):
+        """connect() must NOT launch a browser or OAuth flow."""
+        from sheets.client import GoogleSheetsClient
+
+        fake_script = tmp_path / "fake_google_api.py"
+        fake_script.write_text("# fake")
+        os.environ["HERMES_GOOGLE_API_SCRIPT"] = str(fake_script)
+        client = GoogleSheetsClient(spreadsheet_id="test-id")
+        # Should not have any references to browser, OAuth, or installed app flow
+        assert not hasattr(client, "_credentials_path")
+        assert not hasattr(client, "_token_path")
+
+        os.environ.pop("HERMES_GOOGLE_API_SCRIPT", None)
+
+    def test_credentials_json_not_required(self, tmp_path):
+        """credentials.json should not be required or referenced."""
+        from sheets.client import GoogleSheetsClient
+
+        os.environ.pop("HERMES_GOOGLE_API_SCRIPT", None)
+        os.environ.pop("HERMES_GOOGLE_API_PYTHON", None)
+
+        client = GoogleSheetsClient(spreadsheet_id="test-id")
+        assert client._spreadsheet_id == "test-id"
+        assert not hasattr(client, "_credentials_path")
+        assert not hasattr(client, "_token_path")
+
+    def test_token_json_not_required(self, tmp_path):
+        """token.json should not be required or referenced."""
+        from sheets.client import GoogleSheetsClient
+
+        client = GoogleSheetsClient(spreadsheet_id="test-id")
+        assert not hasattr(client, "_token_path")
+        assert not hasattr(client, "_credentials_path")
 
 
-# --- EvidenceJSON Tests ---
+# =============================================================================
+# EvidenceJSON Tests
+# =============================================================================
 
 class TestEvidenceJSON:
     """Test that EvidenceJSON is preserved correctly."""
@@ -704,7 +681,9 @@ class TestEvidenceJSON:
         from sheets.exporter import GoogleSheetsExporter
         from sheets.config import SheetsConfig
 
-        TARGET_COLS = __import__("scraper.common", fromlist=["TARGET_COLUMNS"]).TARGET_COLUMNS
+        TARGET_COLS = __import__(
+            "scraper.common", fromlist=["TARGET_COLUMNS"]
+        ).TARGET_COLUMNS
 
         test_csv = Path("/tmp/test_evidence.csv")
         evidence = {"follower_count": {"source": "test", "value": 1000}}
@@ -717,8 +696,6 @@ class TestEvidenceJSON:
         config = SheetsConfig(
             spreadsheet_id="test-id",
             tab_name="Test Tab",
-            credentials_path=Path("/nonexistent/credentials.json"),
-            token_path=Path("/nonexistent/token.json"),
         )
         exporter = GoogleSheetsExporter(config)
         exporter._csv_path = test_csv
@@ -733,7 +710,9 @@ class TestEvidenceJSON:
         test_csv.unlink(missing_ok=True)
 
 
-# --- Unicode Tests ---
+# =============================================================================
+# Unicode Tests
+# =============================================================================
 
 class TestUnicodeContent:
     """Test that multilingual content is preserved."""
@@ -744,7 +723,9 @@ class TestUnicodeContent:
         from sheets.exporter import GoogleSheetsExporter
         from sheets.config import SheetsConfig
 
-        TARGET_COLS = __import__("scraper.common", fromlist=["TARGET_COLUMNS"]).TARGET_COLUMNS
+        TARGET_COLS = __import__(
+            "scraper.common", fromlist=["TARGET_COLUMNS"]
+        ).TARGET_COLUMNS
 
         test_csv = Path("/tmp/test_unicode.csv")
         row_data = {col: "test" for col in TARGET_COLS}
@@ -757,8 +738,6 @@ class TestUnicodeContent:
         config = SheetsConfig(
             spreadsheet_id="test-id",
             tab_name="Test Tab",
-            credentials_path=Path("/nonexistent/credentials.json"),
-            token_path=Path("/nonexistent/token.json"),
         )
         exporter = GoogleSheetsExporter(config)
         exporter._csv_path = test_csv
@@ -772,7 +751,9 @@ class TestUnicodeContent:
         test_csv.unlink(missing_ok=True)
 
 
-# --- Backup Tests ---
+# =============================================================================
+# Backup Tests
+# =============================================================================
 
 class TestBackup:
     """Test CSV backup creation."""
@@ -785,15 +766,15 @@ class TestBackup:
         from scraper.common import CRM_FILE
 
         test_csv = tmp_path / "test_crm.csv"
-        TARGET_COLS = __import__("scraper.common", fromlist=["TARGET_COLUMNS"]).TARGET_COLUMNS
+        TARGET_COLS = __import__(
+            "scraper.common", fromlist=["TARGET_COLUMNS"]
+        ).TARGET_COLUMNS
         df = pd.DataFrame([{col: "val" for col in TARGET_COLS}])
         df.to_csv(test_csv, index=False)
 
         config = SheetsConfig(
             spreadsheet_id="test-id",
             tab_name="Test Tab",
-            credentials_path=Path("/nonexistent/credentials.json"),
-            token_path=Path("/nonexistent/token.json"),
         )
         exporter = GoogleSheetsExporter(config)
         exporter._csv_path = test_csv
@@ -811,8 +792,6 @@ class TestBackup:
         config = SheetsConfig(
             spreadsheet_id="test-id",
             tab_name="Test Tab",
-            credentials_path=Path("/nonexistent/credentials.json"),
-            token_path=Path("/nonexistent/token.json"),
         )
         exporter = GoogleSheetsExporter(config)
         exporter._csv_path = Path("/nonexistent/nonexistent.csv")

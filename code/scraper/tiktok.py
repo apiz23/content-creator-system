@@ -50,7 +50,7 @@ def classify_with_local_llm(bio: str, handle: str, model_provider=None, model_na
             "Tags": ["TikTok", "AIGC", "Creator"],
             "PrimaryAITool": tools[0] if tools else "GenAI",
             "AIGCVerdict": "yes" if any(k in combined for k in ["ai", "sora", "synthetic", "bot", "diffusion"]) else "hybrid",
-            "Language": "English",
+            "Language": "",
             "Evidence": "Rule-based keyword fallback"
         }
 
@@ -112,7 +112,7 @@ def scrape_tiktok_profile(page, profile_url: str, model_provider=None, model_nam
             "Email": email,
             "Tags": ", ".join(ai_meta.get("Tags", [])) if isinstance(ai_meta.get("Tags"), list) else str(ai_meta.get("Tags")),
             "LastScrapedAt": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "Language": ai_meta.get("Language", "English"),
+            "Language": ai_meta.get("Language") or "",
             "PrimaryAITool": ai_meta.get("PrimaryAITool"),
             "SampleContentURL": external_link or profile_url,
             "AIGCVerdict": ai_meta.get("AIGCVerdict", "yes"),

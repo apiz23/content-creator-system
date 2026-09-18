@@ -199,7 +199,7 @@ No additional configuration is required. The plugin resolves paths relative to i
 - **`AGENTS.md`** — Full agent workflow rules (16 sections covering data safety, normalization, scraping, cron jobs, and CRM Data Quality Gate)
 - **`code/scraper/run.py`** — Unified dispatcher: `python3 code/scraper/run.py --url <profile-url> --limit 1`
 - **`code/scraper/common.py`** — Shared utilities including `merge_to_crm()`, `load_and_clean_csv()`, `detect_platform_from_url()`, `extract_email()`
-- **`data/Creator-Intel-CRM-List.csv`** — Master CRM (1117 rows as of 2026-09-17, 90 Facebook profiles)
+- **`data/Creator-Intel-CRM-List.csv`** — Master CRM (1127 rows as of 2026-09-18, 90 Facebook profiles)
 - **`data/input/input_channels.csv`** — Persistent scraping queue (1001 rows)
 
 ## Scraper Usage
@@ -231,6 +231,94 @@ hermes cron create "every 3m" "..." --name "Creator Research Discovery & Scrape 
 - EvidenceJSON must be valid RFC 8259 JSON — never Python string representations
 - CSV encoding is always UTF-8 without BOM, using `csv.QUOTE_MINIMAL`
 
+## Google Sheets Integration
+
+One-way synchronization from the local Creator Intel CRM CSV to Google Sheets.
+The CSV remains the **single source of truth**; Google Sheets is a read-only
+view for supervisors.
+
+### Architecture
+
+```text
+Creator Research / Scraper
+          |
+          v
+    Existing CSV data (source of truth)
+         /         \
+        /           \
+       v             v
+Google Sheets     CSV Backup
+(view only)       (data/backups/)
+```
+
+### Authentication Setup
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Create a project (or select existing)
+3. Enable the **Google Sheets API**
+4. Create credentials: **OAuth Client ID** → **Desktop app**
+5. Download `credentials.json` and place it in the project root
+6. The first run will open a browser for authorization; the token is saved to `token.json`
+
+**Never commit** `credentials.json` or `token.json` — both are in `.gitignore`.
+
+### Configuration
+
+Copy `.env.example` to `.env` and set:
+
+```env
+# Google Sheets (ONE-WAY: CSV -> Google Sheets)
+GOOGLE_SHEETS_SPREADSHEET_ID=1zd1KitpivqABavEVzVUCAS9PVMG2G47b8HbCl7YqB-4
+GOOGLE_SHEETS_TAB_NAME=Creator Intel
+```
+
+- `GOOGLE_SHEETS_TAB_NAME` is **required** — the tab must already exist in the spreadsheet.
+- `GOOGLE_SHEETS_RANGE` is optional; if omitted, it auto-generates from the tab name and column count.
+
+### Commands
+
+**Export CSV data to Google Sheets:**
+
+```bash
+python run_sheets.py export
+```
+
+**Create a CSV backup only:**
+
+```bash
+python run_sheets.py backup
+```
+
+Or use the backup utility directly:
+
+```bash
+python -c "from code.scraper.common import backup_crm; print(backup_crm())"
+```
+
+### Data Schema
+
+The Google Sheet receives exactly these 19 columns in order (A:S):
+
+`ProfileURL`, `Name/Handle`, `Platform`, `FollowerCount`, `Email`, `Tags`, `OutreachStatus`, `LastScrapedAt`, `Region`, `Language`, `PrimaryAITool`, `SampleContentURL`, `AIGCVerdict`, `DiscoveredAt`, `Source`, `Notes`, `FeedURL`, `ContactSourceURL`, `EvidenceJSON`
+
+### Export Process
+
+1. Validates the CRM CSV has all 19 required columns
+2. Creates a timestamped backup in `data/backups/`
+3. Connects to Google Sheets using OAuth credentials
+4. Verifies the target tab exists
+5. Clears existing data in the target range
+6. Writes the header row + all CRM rows
+7. Verifies the write succeeded
+
+### Common Errors
+
+- `GOOGLE_SHEETS_TAB_NAME is not configured` — Set `GOOGLE_SHEETS_TAB_NAME` in `.env`
+- `Missing required columns` — The CRM CSV is missing one or more of the 19 expected columns
+- `Credentials file not found` — Place `credentials.json` in the project root
+- `Target tab does not exist` — Create the tab in the spreadsheet manually first
+- `Failed to authenticate` — Ensure `credentials.json` is valid and the Sheets API is enabled
+
 ## Status
 
-Active internal project. The scraper code, CRM data, and knowledge-base contents are project-private.
+Active internal project. The scraper code, CRM data, and knowledge-base contents are project-private."

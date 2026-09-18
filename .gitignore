@@ -26,9 +26,15 @@ venv/
 env/
 ENV/
 
+# Google Sheets credentials (DO NOT commit)
+credentials.json
+token.json
+service-account.json
+
 # Environment variables / secrets
 .env
-# .env.* (template, not secrets)
+.env.*
+!.env.example
 *.env.local
 
 # IDE
@@ -53,6 +59,7 @@ data/pending_review.csv
 
 # Code scrapers
 code/scraper/__pycache__/
+code/sheets/__pycache__/
 
 # Scratch/one-off scripts (deleted)
 scripts/

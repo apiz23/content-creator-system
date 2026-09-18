@@ -52,9 +52,62 @@ data/Creator-Intel-CRM-List.csv (SINGLE SOURCE OF TRUTH)
 - Updated (never replaced) when new scrape data arrives
 - 19 columns: ProfileURL, Name/Handle, Platform, FollowerCount, Email, Tags, OutreachStatus, LastScrapedAt, Region, Language, PrimaryAITool, SampleContentURL, AIGCVerdict, DiscoveredAt, Source, Notes, FeedURL, ContactSourceURL, EvidenceJSON
 
-**Legacy file:** `data/input/input_channels.csv` is deprecated — do NOT use in active workflow.
+**Legacy file:** `data/input/input_channels.csv` is the active scraping queue. Use it for filtering platform scrapers. Do NOT delete it.
 
-### Backup Rules
+### Google Sheets Sync — USER CONFIRMATION REQUIRED
+
+**CRITICAL RULE: Google Sheets synchronization NEVER happens automatically without explicit user confirmation.**
+
+After Creator Research finishes and the CSV has been updated:
+
+1. Validate the CSV.
+2. Create the CSV backup.
+3. Report what was discovered/added.
+4. ASK THE USER whether they want to sync the new records to Google Sheets.
+5. STOP and WAIT for the user's explicit confirmation.
+
+Only if the user explicitly confirms should Hermes run:
+
+```bash
+python3 run_sheets.py export
+```
+
+Do NOT interpret "continue", "done", "okay", "looks good", or "research complete" as permission to sync. The default behavior is:
+
+RESEARCH → CSV → BACKUP → ASK USER → WAIT
+
+NOT: RESEARCH → CSV → BACKUP → GOOGLE SHEETS
+
+### Incremental Append Mode
+
+The Google Sheets exporter uses **incremental append only** — it never clears or rewrites existing rows:
+
+1. Reads existing ProfileURLs from the configured Google Sheet tab
+2. Compares against CRM ProfileURLs (normalized: strip whitespace, lowercase, remove trailing slash)
+3. Appends ONLY new records in a single batch API call
+4. Existing rows are NEVER deleted, replaced, reordered, or modified
+5. If no new records: reports "No new creators to export" and makes no changes
+
+### Empty Value Handling
+
+- `clean_cell_value()` converts null/NaN/None/empty strings → genuinely empty cell `""`
+- Legitimate text like "nanotechnology" is preserved unchanged
+
+### Platform Name Casing
+
+- Platform names must be properly cased: YouTube, TikTok, Facebook, Instagram, LinkedIn, Reddit, Threads, Vimeo, Civitai
+- `code/` cannot be a Python package (stdlib `code` conflict) — use `run_sheets.py` or `sys.path.insert`
+- Never use `python -m code.sheets` — use `python3 run_sheets.py`
+
+### Credentials
+
+- `credentials.json` must be a valid Google OAuth 2.0 Desktop App client credential
+- `token.json` is auto-generated on first OAuth run (gitignored)
+- Do NOT commit either file
+
+See the `sheets-export` skill for full details on the Google Sheets export workflow, tests, and troubleshooting.
+
+## Backup Rules
 
 Every operation that modifies the Master CRM creates a backup first:
 - Location: `data/backups/Creator-Intel-CRM-List_YYYYMMDD_HHMMSS.csv`
@@ -155,6 +208,9 @@ Before declaring any step complete, confirm:
 - **Newlines in Notes**: Replace `\n` with spaces before CSV write
 - **Duplicate ProfileURLs**: Always dedupe case-insensitively
 - **Merge misalignment**: Ensure scraped CSV has `Name/Handle` (not `Handle`) and `ProfileURL` columns
+- **`code/` package conflict**: `code/` conflicts with Python stdlib `code` module — use `sys.path.insert(0, "code")` and import `sheets.*` directly, never `python -m code.sheets`
+- **Full-replace vs append**: The Google Sheets exporter is APPEND-ONLY. If it ever clears and rewrites the sheet, stop and fix `code/sheets/exporter.py`
+- **Google Sheets sync requires explicit user confirmation**: Never auto-export. Always ask first.
 
 ## Data Safety Rules
 
@@ -195,3 +251,4 @@ Before declaring any step complete, confirm:
 
 - `cronjob` skill for scheduled scraping
 - `web` skill for page extraction
+- `sheets-export` skill for Google Sheets export

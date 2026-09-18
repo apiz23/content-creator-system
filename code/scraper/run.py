@@ -11,17 +11,25 @@ Usage:
 
 import sys
 import argparse
+import time
 from pathlib import Path
 
 import pandas as pd
 
-# Add scraper directory to path
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+# Add project directories to path
+# run.py is in code/scraper/, so parent.parent = code/, parent.parent.parent = project root
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+CODE_DIR = _PROJECT_ROOT / "code"
+if str(CODE_DIR) not in sys.path:
+    sys.path.insert(0, str(CODE_DIR))
+if str(CODE_DIR / "scraper") not in sys.path:
+    sys.path.insert(0, str(CODE_DIR / "scraper"))
 
 from common import (
     PROJECT_ROOT, INPUT_CSV_FILE, TARGET_COLUMNS, URL_PATTERNS, PLATFORM_ALIASES,
     load_and_clean_csv, get_column_names, enforce_target_columns,
-    merge_scraped_row, detect_platform_from_url, merge_to_crm, merge_results_to_crm
+    merge_scraped_row, detect_platform_from_url, merge_to_crm, merge_results_to_crm,
+    _now_utc, CRM_FILE, SafeEnricher, backup_crm
 )
 
 URL_COL = "ProfileURL"
@@ -125,6 +133,105 @@ def dispatch_row(platform, row, page=None, model_provider=None, model_name=None)
             return False, None, str(fallback_err)
     except Exception as e:
         return False, None, str(e)
+
+
+def auto_sync_to_sheets():
+    """Automatically sync the CRM CSV to Google Sheets.
+
+    Called after a successful scrape/merge operation.
+    Performs CSV validation, backup, and incremental append-only sync.
+
+    Safety rules:
+    - Append-only: never deletes, clears, or overwrites existing rows.
+    - ProfileURL-based deduplication.
+    - Zero new creators → no write operation.
+    - CSV validation failure → skip sync, report error.
+    - Google Sheets API failure → preserve existing sheet data.
+
+    Returns:
+        dict with sync summary, or None if sync was skipped/disabled.
+    """
+    try:
+        from sheets.config import load_config
+        from sheets.exporter import GoogleSheetsExporter
+    except ImportError as e:
+        print(f"[i] Google Sheets sync skipped: sheets module not available ({e})")
+        return None
+    except Exception as e:
+        print(f"[!] Google Sheets sync skipped due to import error: {e}")
+        return None
+
+    try:
+        config = load_config()
+    except Exception as e:
+        print(f"[i] Google Sheets sync skipped: configuration not available ({e})")
+        return None
+
+    try:
+        exporter = GoogleSheetsExporter(config)
+        result = exporter.export()
+
+        if result.get('new_creators', 0) > 0:
+            print(f"[+] Auto-sync: {result['new_creators']} new creator(s) appended to Google Sheets")
+        else:
+            print(f"[i] Auto-sync: No new creators to export.")
+
+        return result
+
+    except RuntimeError as e:
+        # CSV validation failed — do NOT sync
+        print(f"[!] Google Sheets sync aborted: CSV validation failed — {e}")
+        return None
+    except Exception as e:
+        # Google Sheets API failure — existing sheet data is untouched
+        print(f"[!] Google Sheets sync failed: {e}")
+        return None
+
+
+def auto_sync_reshaped(crm_df: pd.DataFrame) -> dict:
+    """Sync re-scraped CRM changes to Google Sheets (column-level updates).
+
+    For existing creators, updates only changed cells.
+    For new creators, appends rows (append-only).
+
+    Returns:
+        dict with sync summary.
+    """
+    try:
+        from sheets.config import load_config
+        from sheets.exporter import GoogleSheetsExporter
+    except ImportError:
+        print(f"[i] Google Sheets re-scrape sync skipped: sheets module not available")
+        return None
+    except Exception as e:
+        print(f"[!] Google Sheets re-scrape sync skipped: {e}")
+        return None
+
+    try:
+        config = load_config()
+    except Exception:
+        print(f"[i] Google Sheets re-scrape sync skipped: configuration not available")
+        return None
+
+    try:
+        exporter = GoogleSheetsExporter(config)
+        result = exporter.export_reshaped(crm_df)
+
+        if result:
+            updated = result.get('updated_creators', 0)
+            appended = result.get('appended_creators', 0)
+            if updated > 0:
+                print(f"[+] Re-scrape sync: {updated} creator(s) updated in Google Sheets")
+            if appended > 0:
+                print(f"[+] Re-scrape sync: {appended} new creator(s) appended to Google Sheets")
+            if updated == 0 and appended == 0:
+                print(f"[i] Re-scrape sync: No changes to export to Google Sheets")
+
+        return result
+
+    except Exception as e:
+        print(f"[!] Google Sheets re-scrape sync failed: {e}")
+        return None
 
 
 def run_batch(input_csv, limit=None, model_provider=None, model_name=None):
@@ -268,6 +375,14 @@ def run_batch(input_csv, limit=None, model_provider=None, model_name=None):
         print(f"    CRM: {crm_stats['before_count']} → {crm_stats['after_count']} rows")
         print(f"    Updated: {crm_stats['updated']}, Appended: {crm_stats['appended']}, Skipped: {crm_stats['skipped']}, Pending Review: {crm_stats['pending_review']}")
 
+        # Auto-sync to Google Sheets
+        print(f"\n[+] Auto-syncing to Google Sheets...")
+        sync_result = auto_sync_to_sheets()
+        if sync_result:
+            print(f"    Sheets: {sync_result.get('new_creators', 0)} new rows appended")
+        else:
+            print(f"    Sheets sync skipped or failed (existing data preserved)")
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -282,7 +397,42 @@ Examples:
   python3 code/scraper/run.py --url https://www.tiktok.com/@example --limit 1
   python3 code/scraper/run.py --input data/input/input_channels.csv --limit 10
   python3 code/scraper/run.py --input data/input/input_channels.csv --model-provider api --model-name gpt-5.6
+  python3 code/scraper/run.py rescrape --source csv --limit 50 --dry-run
+  python3 code/scraper/run.py rescrape --source sheets --limit 25
         """
+    )
+    
+    # Sub-command for rescrape mode
+    subparsers = parser.add_subparsers(dest="command")
+    
+    rescrape_parser = subparsers.add_parser("rescrape", help="Re-scrape existing CRM creators for data enrichment")
+    rescrape_parser.add_argument(
+        "--source", choices=["csv", "sheets", "auto"], default="csv",
+        help="Source of re-scrape queue: csv, sheets, or auto"
+    )
+    rescrape_parser.add_argument(
+        "--limit", type=int, default=None,
+        help="Max creators to re-scrape"
+    )
+    rescrape_parser.add_argument(
+        "--offset", type=int, default=0,
+        help="Offset for batching"
+    )
+    rescrape_parser.add_argument(
+        "--dry-run", action="store_true",
+        help="Preview changes without modifying any files"
+    )
+    rescrape_parser.add_argument(
+        "--model-provider", type=str, default=None,
+        help="Override MODEL_PROVIDER"
+    )
+    rescrape_parser.add_argument(
+        "--model-name", type=str, default=None,
+        help="Override MODEL_NAME"
+    )
+    rescrape_parser.add_argument(
+        "--no-sync", action="store_true",
+        help="Skip Google Sheets sync after re-scrape"
     )
     
     group = parser.add_mutually_exclusive_group(required=False)
@@ -324,6 +474,19 @@ Examples:
     # Handle model override display
     if args.model_provider or args.model_name:
         print(f"[+] Model override: provider={args.model_provider}, model={args.model_name}")
+    
+    # Re-scrape mode
+    if args.command == "rescrape":
+        rescrape_creators(
+            source=args.source,
+            limit=args.limit,
+            offset=args.offset,
+            dry_run=args.dry_run,
+            model_provider=args.model_provider,
+            model_name=args.model_name,
+            no_sync=args.no_sync,
+        )
+        return
     
     # Determine mode: --input takes priority, otherwise default to batch if neither platform nor url given
     if args.input or (not args.platform and not args.url):
@@ -399,13 +562,39 @@ Examples:
             merged = merge_scraped_row(single_row.iloc[0].to_dict(), result)
             result_df = pd.DataFrame([merged])
             result_df = enforce_target_columns(result_df)
-            
+
+            # Generate Source and DiscoveredAt for new records
+            result_dict = result_df.iloc[0].to_dict()
+            crm_path = Path(CRM_FILE)
+            if crm_path.exists():
+                import pandas as _pd
+                _crm = _pd.read_csv(crm_path)
+                profile_url_norm = str(result_dict.get("ProfileURL", "")).strip().lower().rstrip("/")
+                existing_mask = _crm["ProfileURL"].astype(str).str.strip().str.lower().str.rstrip("/") == profile_url_norm
+                if existing_mask.any():
+                    # Existing creator: preserve existing Source and DiscoveredAt
+                    existing_row = _crm[existing_mask].iloc[0].to_dict()
+                    result_dict["Source"] = existing_row.get("Source") or result_dict.get("Source")
+                    result_dict["DiscoveredAt"] = existing_row.get("DiscoveredAt") or result_dict.get("DiscoveredAt")
+                else:
+                    # New creator: generate Source and DiscoveredAt
+                    if not result_dict.get("Source") or result_dict["Source"] in ("", "nan", "None"):
+                        result_dict["Source"] = str(platform)
+                    if not result_dict.get("DiscoveredAt") or result_dict["DiscoveredAt"] in ("", "nan", "None"):
+                        result_dict["DiscoveredAt"] = _now_utc()
+
             # Merge into master CRM following safe-write procedure
             print(f"[+] Merging into master CRM...")
-            before_count, after_count, crm_action = merge_to_crm(
-                result_df.iloc[0].to_dict()
-            )
+            before_count, after_count, crm_action = merge_to_crm(result_dict)
             print(f"    CRM: {before_count} → {after_count} rows ({crm_action})")
+
+            # Auto-sync to Google Sheets
+            print(f"\n[+] Auto-syncing to Google Sheets...")
+            sync_result = auto_sync_to_sheets()
+            if sync_result:
+                print(f"    Sheets: {sync_result.get('new_creators', 0)} new rows appended")
+            else:
+                print(f"    Sheets sync skipped or failed (existing data preserved)")
         else:
             print(f"[!] Error scraping profile: {error}")
             result_df = single_row
@@ -415,6 +604,318 @@ Examples:
         result_df.to_csv(output_csv, index=False)
         print(f"[+] Results saved to {output_csv}")
         print(f"[+] Processed: 1 | Successful: {1 if success else 0} | Failed: {0 if success else 1}")
+
+
+def rescrape_creators(source="csv", limit=None, offset=0, dry_run=False,
+                      model_provider=None, model_name=None, no_sync=False):
+    """Re-scrape existing CRM creators for data enrichment.
+
+    Args:
+        source: "csv", "sheets", or "auto"
+        limit: Max creators to re-scrape
+        offset: Offset for batching
+        dry_run: If True, preview changes without writing
+        model_provider: Model override
+        model_name: Model override
+        no_sync: If True, skip Google Sheets sync after re-scrape
+    """
+    import pandas as pd
+    from playwright.sync_api import sync_playwright
+    from facebook import create_facebook_context
+    from datetime import datetime, timezone
+    import time
+
+    print(f"[+] Starting re-scrape mode: source={source}, limit={limit}, offset={offset}, dry_run={dry_run}")
+
+    # ---- STEP 1: Load existing creators ----
+    crm_path = Path(CRM_FILE)
+    if not crm_path.exists():
+        print(f"[!] CRM file not found: {crm_path}")
+        return
+
+    # Try loading from Google Sheets if source is "sheets" or "auto"
+    if source in ("sheets", "auto"):
+        try:
+            from sheets.config import load_config
+            from sheets.exporter import GoogleSheetsExporter
+            config = load_config()
+            exporter = GoogleSheetsExporter(config)
+            crm_df = exporter._load_csv()
+            print(f"[+] Loaded {len(crm_df)} creators from Google Sheets")
+            source_used = "sheets"
+        except Exception as e:
+            print(f"[i] Google Sheets source unavailable ({e}), falling back to CSV")
+            crm_df = load_and_clean_csv(str(crm_path))
+            source_used = "csv"
+    else:
+        crm_df = load_and_clean_csv(str(crm_path))
+        source_used = "csv"
+
+    print(f"[+] Total existing creators: {len(crm_df)}")
+
+    # Validate ProfileURLs
+    valid_mask = crm_df["ProfileURL"].astype(str).str.strip().str.len() > 0
+    crm_df = crm_df[valid_mask].copy()
+    print(f"[+] Valid creators with ProfileURLs: {len(crm_df)}")
+
+    # Apply offset and limit
+    crm_df = crm_df.iloc[offset:]
+    if limit is not None:
+        crm_df = crm_df.head(limit)
+
+    print(f"[+] Processing {len(crm_df)} creator(s) for re-scrape...")
+
+    # ---- STEP 2: Build platform groups for dispatching ----
+    platform_groups = {}
+    for idx, row in crm_df.iterrows():
+        url = str(row.get("ProfileURL", "")).strip()
+        platform = detect_platform_from_url(url)
+        if not platform:
+            plat_val = str(row.get("Platform", "")).strip().lower()
+            if plat_val in URL_PATTERNS or plat_val in PLATFORM_ALIASES:
+                platform = PLATFORM_ALIASES.get(plat_val, plat_val)
+        if platform and url:
+            platform_groups.setdefault(platform, []).append((idx, url, row.to_dict()))
+
+    if not platform_groups:
+        print(f"[!] No valid creators with recognized platforms found.")
+        return
+
+    print(f"[+] Platforms to process: {', '.join(f'{k}({len(v)})' for k, v in sorted(platform_groups.items()))}")
+
+    # ---- STEP 3: Re-scrape each creator ----
+    enriched_rows = []
+    change_report = []
+    failed = []
+
+    browser_plats = {p for p, (_, needs_browser, _) in PER_PROFILE_SCRAPERS.items() if needs_browser}
+    needs_browser = any(p in browser_plats for p in platform_groups)
+
+    if needs_browser:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            context = create_facebook_context(browser)
+            page = context.new_page()
+
+            for platform in sorted(platform_groups.keys()):
+                if platform not in browser_plats:
+                    continue
+                rows = platform_groups[platform]
+                print(f"\n--- Re-scraping {platform.upper()} ({len(rows)} profiles) ---")
+                _scrape_platform_rows(
+                    platform, rows, page, crm_df, enriched_rows,
+                    change_report, failed, model_provider, model_name,
+                    dry_run, browser_plats
+                )
+                time.sleep(1)
+
+            browser.close()
+    else:
+        for platform in sorted(platform_groups.keys()):
+            if platform in browser_plats:
+                continue
+            rows = platform_groups[platform]
+            print(f"\n--- Re-scraping {platform.upper()} ({len(rows)} profiles) ---")
+            _scrape_platform_rows(
+                platform, rows, None, crm_df, enriched_rows,
+                change_report, failed, model_provider, model_name,
+                dry_run, browser_plats
+            )
+            time.sleep(1)
+
+    # ---- STEP 4: Merge enriched data back into CRM ----
+    if not dry_run and enriched_rows:
+        print(f"\n[+] Merging {len(enriched_rows)} enriched results into CRM...")
+        before_count = len(pd.read_csv(crm_path))
+
+        # Create backup BEFORE modifying CRM
+        backup_path = backup_crm(crm_path)
+        print(f"    Backup: {backup_path}")
+
+        # Create a DataFrame from enriched rows and merge
+        results_df = pd.DataFrame(enriched_rows)
+        results_df = enforce_target_columns(results_df)
+
+        # Merge each enriched row into CRM
+        crm_df_existing = pd.read_csv(crm_path)
+        for _, row in results_df.iterrows():
+            row_dict = row.to_dict()
+            profile_url = str(row_dict.get("ProfileURL", "")).strip()
+            profile_url_norm = profile_url.lower().rstrip("/")
+            existing_mask = crm_df_existing["ProfileURL"].astype(str).str.strip().str.lower().str.rstrip("/") == profile_url_norm
+
+            if existing_mask.any():
+                # Update existing row
+                idx = existing_mask[existing_mask].index[0]
+                existing_row = crm_df_existing.iloc[idx].to_dict()
+                # Build scraped_data from the enriched row (strip immutable fields)
+                scraped_data = {}
+                for col in TARGET_COLUMNS:
+                    if col not in SafeEnricher.IMMUTABLE_FIELDS:
+                        scraped_data[col] = row_dict.get(col)
+                enricher = SafeEnricher()
+                merged, changes = enricher.enrich(existing_row, scraped_data, scrape_successful=True)
+                for key, value in merged.items():
+                    if key in crm_df_existing.columns:
+                        crm_df_existing.at[idx, key] = value
+            else:
+                # Should not happen in re-scrape mode, but handle gracefully
+                crm_df_existing = pd.concat([crm_df_existing, pd.DataFrame([row_dict])], ignore_index=True)
+
+        # Validate and write
+        crm_df_existing = crm_df_existing[TARGET_COLUMNS]
+        assert len(crm_df_existing) >= before_count, "Row count decreased after re-scrape!"
+        crm_df_existing.to_csv(crm_path, index=False)
+        after_count = len(pd.read_csv(crm_path))
+        print(f"    CRM: {before_count} → {after_count} rows")
+
+        # ---- STEP 5: Google Sheets column-level sync ----
+        if not dry_run and not no_sync:
+            print(f"\n[+] Syncing changes to Google Sheets...")
+            sync_result = auto_sync_reshaped(crm_df_existing)
+            if sync_result:
+                print(f"    Google Sheets sync completed")
+            else:
+                print(f"    Google Sheets sync skipped (existing data preserved)")
+    elif dry_run:
+        print(f"\n[DRY RUN] No files modified.")
+        print(f"[DRY RUN] Would merge {len(enriched_rows)} enriched records")
+        print(f"[DRY RUN] Failed: {len(failed)} creators")
+
+    # ---- STEP 6: Report ----
+    print(f"\n{'='*60}")
+    print(f"RE-SCRAPE REPORT")
+    print(f"{'='*60}")
+    print(f"Source: {source_used}")
+    print(f"Mode: {'DRY RUN' if dry_run else 'LIVE'}")
+    print(f"Creators processed: {len(crm_df)}")
+    print(f"Successfully enriched: {len(enriched_rows)}")
+    print(f"Failed: {len(failed)}")
+    print(f"\nChanges:")
+    for change in change_report[:20]:  # Show first 20
+        print(f"  {change['field']}: {change['old_value']} → {change['new_value']} ({change['status']})")
+    if len(change_report) > 20:
+        print(f"  ... and {len(change_report) - 20} more changes")
+
+    if failed:
+        print(f"\nFailed creators:")
+        for f in failed[:10]:
+            print(f"  {f}")
+        if len(failed) > 10:
+            print(f"  ... and {len(failed) - 10} more")
+
+    print(f"\n{'='*60}")
+    if dry_run:
+        print(f"DRY RUN COMPLETE — no files modified")
+    else:
+        print(f"RE-SCRAPE COMPLETE — CRM updated, backups created")
+
+
+def _scrape_platform_rows(platform, rows, page, crm_df, enriched_rows,
+                           change_report, failed, model_provider, model_name,
+                           dry_run, browser_plats, scrape_successful_list=None):
+    """Helper: scrape multiple rows for a platform and collect enriched results.
+
+    Args:
+        platform: Platform name key
+        rows: List of (idx, url, row_dict) tuples
+        page: Playwright page object (or None for non-browser scrapers)
+        crm_df: Original CRM DataFrame for reference
+        enriched_rows: List to append enriched row dicts to
+        change_report: List to append change dicts to
+        failed: List to append failed profile URLs to
+        model_provider: Model override
+        model_name: Model override
+        dry_run: If True, scrape but don't write
+        browser_plats: Set of browser-based platform names
+        scrape_successful_list: Optional list to track success status
+    """
+    from common import normalize_scraped_result, SafeEnricher
+
+    for i, (idx, url, row_dict) in enumerate(rows, 1):
+        print(f"[{i}/{len(rows)}] {platform}: {url}")
+
+        # Get existing CRM data for this creator
+        profile_url_norm = url.strip().lower().rstrip("/")
+        existing_mask = crm_df["ProfileURL"].astype(str).str.strip().str.lower().str.rstrip("/") == profile_url_norm
+
+        if not existing_mask.any():
+            print(f"    [!] Creator not found in CRM, skipping")
+            failed.append(url)
+            continue
+
+        existing_row = crm_df[existing_mask].iloc[0].to_dict()
+
+        # Dispatch to scraper
+        try:
+            if platform in ["reddit", "civitai"]:
+                username = extract_username_from_url(platform, url)
+                if not username:
+                    print(f"    [!] Could not extract username")
+                    failed.append(url)
+                    continue
+                success, result, error = dispatch_row(platform, row_dict, model_provider=model_provider, model_name=model_name)
+            elif platform in browser_plats:
+                if page is None:
+                    print(f"    [!] Browser required but no page provided")
+                    failed.append(url)
+                    continue
+                success, result, error = dispatch_row(platform, row_dict, page=page, model_provider=model_provider, model_name=model_name)
+            else:
+                success, result, error = dispatch_row(platform, row_dict, model_provider=model_provider, model_name=model_name)
+        except Exception as e:
+            print(f"    [!] Scrape error: {e}")
+            failed.append(url)
+            continue
+
+        if not success or not result:
+            print(f"    [!] Scrape failed: {error}")
+            failed.append(url)
+            continue
+
+        # Normalize scraped data
+        result = normalize_scraped_result(result)
+
+        # Build scraped data for enrichment (exclude immutable fields)
+        scraped_for_enrich = {}
+        for col in TARGET_COLUMNS:
+            if col not in SafeEnricher.IMMUTABLE_FIELDS:
+                scraped_for_enrich[col] = result.get(col)
+
+        # Add existing immutable values that scraper might not have returned
+        for col in SafeEnricher.IMMUTABLE_FIELDS - {"ProfileURL"}:
+            if col not in scraped_for_enrich or is_val_empty(scraped_for_enrich.get(col)):
+                scraped_for_enrich[col] = existing_row.get(col, "")
+
+        # Ensure ProfileURL is the existing one
+        scraped_for_enrich["ProfileURL"] = existing_row.get("ProfileURL", "")
+
+        # Enrich
+        enricher = SafeEnricher()
+        enriched, changes = enricher.enrich(existing_row, scraped_for_enrich, scrape_successful=True)
+
+        enriched["LastScrapedAt"] = enricher._now_utc()
+
+        # Collect changes
+        for change in changes:
+            change["profile_url"] = url
+            change_report.append(change)
+
+        enriched_rows.append(enriched)
+        print(f"    [+] Enriched: {len(changes)} changes detected")
+
+        if scrape_successful_list is not None:
+            scrape_successful_list.append(True)
+
+        time.sleep(2)  # Rate limiting
+
+
+def is_val_empty(val) -> bool:
+    """Check if a value is truly empty/unavailable (NaN-safe)."""
+    if val is None:
+        return True
+    s = str(val).strip()
+    return s in ("", "None", "N/A", "nan", "NaN", "null", "NULL")
 
 
 if __name__ == "__main__":

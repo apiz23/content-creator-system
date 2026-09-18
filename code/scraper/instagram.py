@@ -46,12 +46,12 @@ def classify_with_local_llm(bio: str, handle: str, model_provider=None, model_na
         combined = f"{handle} {bio}".lower()
         tools = [t.title() for t in ["midjourney", "sora", "runway", "kling", "luma", "chatgpt"] if t in combined]
         return {
-            "Tags": ["Instagram", "AIGC"],
-            "PrimaryAITool": tools[0] if tools else "GenAI",
-            "AIGCVerdict": "yes" if any(k in combined for k in ["ai", "synthetic", "midjourney", "art"]) else "hybrid",
-            "Language": "English",
-            "Evidence": "Rule-based fallback"
-        }
+                    "Tags": ["Instagram", "AIGC"],
+                    "PrimaryAITool": tools[0] if tools else "GenAI",
+                    "AIGCVerdict": "yes" if any(k in combined for k in ["ai", "synthetic", "midjourney", "art"]) else "hybrid",
+                    "Language": "",
+                    "Evidence": "Rule-based fallback"
+                }
 
 
 def scrape_instagram_playwright(page, profile_url: str, model_provider=None, model_name=None):
@@ -113,7 +113,7 @@ def scrape_instagram_playwright(page, profile_url: str, model_provider=None, mod
             "Email": email,
             "Tags": ", ".join(ai_meta.get("Tags", [])) if isinstance(ai_meta.get("Tags"), list) else str(ai_meta.get("Tags")),
             "LastScrapedAt": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "Language": ai_meta.get("Language", "English"),
+            "Language": ai_meta.get("Language") or "",
             "PrimaryAITool": ai_meta.get("PrimaryAITool"),
             "SampleContentURL": profile_url,
             "AIGCVerdict": ai_meta.get("AIGCVerdict", "yes"),

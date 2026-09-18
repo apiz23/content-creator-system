@@ -107,20 +107,72 @@ def merge_scraped_row(row_dict, scraped_data):
     if not scraped_data:
         return row_dict
 
+    def is_val_empty(val):
+        """Check if a value is truly empty/unavailable."""
+        if val is None:
+            return True
+        s = str(val).strip()
+        return s in ("", "None", "N/A", "nan", "NaN")
+
     row_dict["Name/Handle"] = scraped_data.get("Handle") or row_dict.get("Name/Handle")
-    row_dict["FollowerCount"] = scraped_data.get("FollowerCount") or row_dict.get("FollowerCount")
+
+    # FollowerCount: treat "N/A" as unavailable, preserve existing valid value
+    new_follower = scraped_data.get("FollowerCount")
+    if not is_val_empty(new_follower):
+        row_dict["FollowerCount"] = new_follower
+    # else: preserve existing valid FollowerCount if any
 
     if row_dict.get("Email") in [None, "", "not exposed"]:
-        row_dict["Email"] = scraped_data.get("Email")
+        email = scraped_data.get("Email")
+        if not is_val_empty(email):
+            row_dict["Email"] = email
 
     row_dict["LastScrapedAt"] = scraped_data.get("LastScrapedAt")
-    row_dict["Region"] = scraped_data.get("Region") or row_dict.get("Region")
-    row_dict["Language"] = scraped_data.get("Language") or row_dict.get("Language")
+
+    # Region: only update if scraped_data has a valid value
+    new_region = scraped_data.get("Region")
+    if not is_val_empty(new_region):
+        row_dict["Region"] = new_region
+
+    # Language: only update if scraped_data has a valid, non-empty language
+    new_language = scraped_data.get("Language")
+    if not is_val_empty(new_language):
+        row_dict["Language"] = new_language
+    # else: preserve existing Language if any
+
     row_dict["PrimaryAITool"] = scraped_data.get("PrimaryAITool") or row_dict.get("PrimaryAITool")
     row_dict["SampleContentURL"] = scraped_data.get("SampleContentURL") or row_dict.get("SampleContentURL")
     row_dict["AIGCVerdict"] = scraped_data.get("AIGCVerdict")
     row_dict["Notes"] = scraped_data.get("Notes")
-    row_dict["FeedURL"] = scraped_data.get("FeedURL")
+
+    # Tags: map from scraped_data if available, otherwise preserve existing
+    new_tags = scraped_data.get("Tags")
+    if not is_val_empty(new_tags):
+        row_dict["Tags"] = new_tags
+
+    # OutreachStatus: default to "New" for new records, preserve existing for known statuses
+    if is_val_empty(row_dict.get("OutreachStatus")):
+        row_dict["OutreachStatus"] = scraped_data.get("OutreachStatus") or "New"
+    # else: preserve existing human-maintained outreach status
+
+    # Source: use scraped source if available, otherwise preserve existing
+    new_source = scraped_data.get("Source")
+    if not is_val_empty(new_source):
+        row_dict["Source"] = new_source
+
+    # DiscoveredAt: only set for new records (existing row has empty DiscoveredAt)
+    # If row already has a DiscoveredAt, never overwrite it
+    if is_val_empty(row_dict.get("DiscoveredAt")):
+        discovered = scraped_data.get("DiscoveredAt")
+        if not is_val_empty(discovered):
+            row_dict["DiscoveredAt"] = discovered
+
+    # FeedURL: preserve existing if new value is empty
+    new_feed = scraped_data.get("FeedURL")
+    if not is_val_empty(new_feed):
+        row_dict["FeedURL"] = new_feed
+    # else: preserve existing FeedURL if any
+
     row_dict["ContactSourceURL"] = scraped_data.get("ContactSourceURL")
     row_dict["EvidenceJSON"] = scraped_data.get("EvidenceJSON")
 
@@ -434,9 +486,16 @@ def is_discovery_only(result_dict: dict) -> bool:
         return True
     follower = str(result_dict.get("FollowerCount", "")).strip()
     bio_preview = str(result_dict.get("Notes", "")).strip()
-    if not follower or follower in ("", "None", "N/A") or "discovery" in bio_preview.lower():
+    # Treat "N/A" as unavailable data, not necessarily discovery-only
+    if not follower or follower in ("", "None", "nan", "NaN") or "discovery" in bio_preview.lower():
         return True
     return False
+
+
+def _now_utc() -> str:
+    """Return current UTC timestamp in ISO format."""
+    from datetime import datetime, timezone
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 def normalize_scraped_result(result_dict: dict) -> dict:
     """Apply all Output Formatting Standard rules to a scraped result dict.
@@ -481,9 +540,326 @@ def normalize_scraped_result(result_dict: dict) -> dict:
             resolved = resolve_final_url(str(url_val))
             result_dict[url_field] = resolved
 
-    # 5. Clean Name/Handle of any UI tokens
+        # 5. Clean Name/Handle of any UI tokens
     name = result_dict.get("Name/Handle", "")
     if name and name != "None":
         result_dict["Name/Handle"] = clean_platform_ui_text(str(name))
 
     return result_dict
+
+
+# =============================================================================
+# SafeEnricher — Field-level safe enrichment for re-scraping
+# =============================================================================
+
+class SafeEnricher:
+    """Enriches existing CRM records with scraped data without overwriting
+    human-maintained fields.
+
+    Core principle: NEVER LOSE DATA. Re-scraping is additive/enrichment only.
+
+    For every field:
+    - IF existing is empty AND new is valid/non-empty → fill it
+    - IF existing is populated AND new is valid → update only per field rules
+    - IF existing is populated AND new is empty/null → KEEP existing
+    - NEVER replace existing data with empty/null/None/NaN/"N/A"
+    """
+
+    # Fields that are NEVER overwritten during re-scraping
+    IMMUTABLE_FIELDS = {"ProfileURL", "DiscoveredAt", "Source", "OutreachStatus"}
+
+    # Fields that preserve existing values when new scraped value is empty/invalid
+    PRESERVE_IF_EMPTY = {
+        "Name/Handle", "Platform", "FollowerCount", "Email",
+        "Tags", "Region", "Language", "PrimaryAITool",
+        "SampleContentURL", "AIGCVerdict", "Notes", "FeedURL",
+        "ContactSourceURL", "EvidenceJSON",
+    }
+
+    # Fields that SHOULD be updated on every successful scrape
+    UPDATE_ON_SUCCESS = {"LastScrapedAt"}
+
+    # Fields where new valid value ENRICHES (merges with existing, not replaces)
+    ENRICH_FIELDS = {"Tags"}
+
+    @staticmethod
+    def is_val_empty(val) -> bool:
+        """Check if a value is truly empty/unavailable (NaN-safe)."""
+        if val is None:
+            return True
+        s = str(val).strip()
+        return s in ("", "None", "N/A", "nan", "NaN", "null", "NULL")
+
+    @staticmethod
+    def _normalize_profile_url(url: str) -> str:
+        """Normalize ProfileURL for comparison."""
+        return str(url).strip().lower().rstrip("/")
+
+    def enrich(self, existing_row: dict, scraped_data: dict, scrape_successful: bool = True) -> tuple[dict, list[dict]]:
+        """Enrich an existing CRM record with scraped data.
+
+        Args:
+            existing_row: The current CRM row dict (19 columns).
+            scraped_data: The new scraped data dict.
+            scrape_successful: Whether the scrape succeeded.
+
+        Returns:
+            tuple of (enriched_row_dict, change_report_list)
+            change_report_list contains dicts with:
+                field, old_value, new_value, status ("changed"|"unchanged"|"preserved")
+        """
+        enriched = existing_row.copy()
+        changes = []
+
+        # Track old values for comparison
+        old_values = {k: v for k, v in enriched.items()}
+
+        if not scraped_data:
+            # No scraped data — keep everything as-is
+            # Still report no changes
+            for field in self.IMMUTABLE_FIELDS | self.PRESERVE_IF_EMPTY | self.UPDATE_ON_SUCCESS:
+                if field in enriched:
+                    changes.append({
+                        "field": field, "old_value": old_values.get(field),
+                        "new_value": old_values.get(field), "status": "unchanged"
+                    })
+            return enriched, changes
+
+        # ---- IMMUTABLE FIELDS: NEVER change ----
+        # ProfileURL is the identity key — never change
+        # DiscoveredAt is original discovery time — never change
+        # Source is original discovery source — never change
+        # OutreachStatus is human-maintained — never auto-change
+
+        # ---- LASTSCRAPEDAT: Update on success only ----
+        if scrape_successful:
+            new_scraped_at = scraped_data.get("LastScrapedAt") or self._now_utc()
+            if not self.is_val_empty(new_scraped_at):
+                enriched["LastScrapedAt"] = new_scraped_at
+                changes.append({
+                    "field": "LastScrapedAt",
+                    "old_value": old_values.get("LastScrapedAt"),
+                    "new_value": new_scraped_at, "status": "changed"
+                })
+        else:
+            changes.append({
+                "field": "LastScrapedAt",
+                "old_value": old_values.get("LastScrapedAt"),
+                "new_value": old_values.get("LastScrapedAt"), "status": "unchanged"
+            })
+
+        # ---- FIELD-LEVEL ENRICHMENT ----
+        # Name/Handle: fill if empty, update if valid
+        self._enrich_name_handle(enriched, scraped_data, old_values, changes)
+
+        # Platform: fill if missing
+        self._enrich_platform(enriched, scraped_data, old_values, changes)
+
+        # FollowerCount: update if valid (dynamic field)
+        self._enrich_follower_count(enriched, scraped_data, old_values, changes)
+
+        # Email: fill empty, never replace valid
+        self._enrich_email(enriched, scraped_data, old_values, changes)
+
+        # Tags: enrich (merge, dedup)
+        self._enrich_tags(enriched, scraped_data, old_values, changes)
+
+        # Region: update only if reliable
+        self._enrich_region(enriched, scraped_data, old_values, changes)
+
+        # Language: update only if reliable evidence
+        self._enrich_language(enriched, scraped_data, old_values, changes)
+
+        # PrimaryAITool: enrich if reliable
+        self._enrich_ai_tool(enriched, scraped_data, old_values, changes)
+
+        # SampleContentURL: update only if valid new URL
+        self._enrich_sample_url(enriched, scraped_data, old_values, changes)
+
+        # FeedURL: update only if valid new URL
+        self._enrich_feed_url(enriched, scraped_data, old_values, changes)
+
+        # ContactSourceURL: update only if valid URL
+        self._enrich_contact_url(enriched, scraped_data, old_values, changes)
+
+        # AIGCVerdict: update only if new successful classification
+        self._enrich_aigc_verdict(enriched, scraped_data, old_values, changes)
+
+        # Notes: NEVER erase
+        self._enrich_notes(enriched, scraped_data, old_values, changes)
+
+        # EvidenceJSON: enrich if valid new evidence
+        self._enrich_evidence_json(enriched, scraped_data, old_values, changes)
+
+        # ---- Optional status fields from scrapers ----
+        for field in ["ScrapeStatus", "ScrapeError", "FollowerStatus", "EmailStatus",
+                       "RegionStatus", "LanguageStatus", "AIToolStatus"]:
+            if field in scraped_data:
+                enriched[field] = scraped_data[field]
+                changes.append({
+                    "field": field,
+                    "old_value": old_values.get(field),
+                    "new_value": scraped_data[field], "status": "changed"
+                })
+
+        # Report unchanged fields
+        for field in self.IMMUTABLE_FIELDS:
+            if field in enriched:
+                changes.append({
+                    "field": field,
+                    "old_value": old_values.get(field),
+                    "new_value": old_values.get(field), "status": "preserved"
+                })
+
+        return enriched, changes
+
+    def _enrich_name_handle(self, enriched, scraped, old, changes):
+        new_val = scraped.get("Handle") or scraped.get("Name/Handle")
+        if not self.is_val_empty(new_val):
+            if self.is_val_empty(old.get("Name/Handle")):
+                enriched["Name/Handle"] = new_val
+                changes.append({"field": "Name/Handle", "old_value": old.get("Name/Handle"),
+                                "new_value": new_val, "status": "changed"})
+            elif str(old.get("Name/Handle", "")).strip() != str(new_val).strip():
+                # Only update if different — otherwise preserve
+                enriched["Name/Handle"] = new_val
+                changes.append({"field": "Name/Handle", "old_value": old.get("Name/Handle"),
+                                "new_value": new_val, "status": "changed"})
+
+    def _enrich_platform(self, enriched, scraped, old, changes):
+        new_val = scraped.get("Platform")
+        if not self.is_val_empty(new_val) and self.is_val_empty(old.get("Platform")):
+            enriched["Platform"] = new_val
+            changes.append({"field": "Platform", "old_value": old.get("Platform"),
+                            "new_value": new_val, "status": "changed"})
+
+    def _enrich_follower_count(self, enriched, scraped, old, changes):
+        new_val = scraped.get("FollowerCount")
+        if not self.is_val_empty(new_val):
+            enriched["FollowerCount"] = new_val
+            changes.append({"field": "FollowerCount", "old_value": old.get("FollowerCount"),
+                            "new_value": new_val, "status": "changed"})
+
+    def _enrich_email(self, enriched, scraped, old, changes):
+        new_val = scraped.get("Email")
+        if not self.is_val_empty(new_val) and self.is_val_empty(old.get("Email")):
+            enriched["Email"] = new_val
+            changes.append({"field": "Email", "old_value": old.get("Email"),
+                            "new_value": new_val, "status": "changed"})
+
+    def _enrich_tags(self, enriched, scraped, old, changes):
+        new_tags = scraped.get("Tags")
+        if not self.is_val_empty(new_tags):
+            existing_tags = str(old.get("Tags", "")).strip()
+            if self.is_val_empty(existing_tags):
+                enriched["Tags"] = new_tags
+                changes.append({"field": "Tags", "old_value": old.get("Tags"),
+                                "new_value": new_tags, "status": "changed"})
+            else:
+                # Merge: split both, dedup, rejoin
+                existing_set = set(t.strip() for t in existing_tags.split(",") if t.strip())
+                new_set = set(t.strip() for t in str(new_tags).split(",") if t.strip())
+                merged = existing_set | new_set
+                merged_str = ", ".join(sorted(merged))
+                if merged_str != existing_tags:
+                    enriched["Tags"] = merged_str
+                    changes.append({"field": "Tags", "old_value": old.get("Tags"),
+                                    "new_value": merged_str, "status": "changed"})
+
+    def _enrich_region(self, enriched, scraped, old, changes):
+        new_val = scraped.get("Region")
+        if not self.is_val_empty(new_val) and self.is_val_empty(old.get("Region")):
+            enriched["Region"] = new_val
+            changes.append({"field": "Region", "old_value": old.get("Region"),
+                            "new_value": new_val, "status": "changed"})
+
+    def _enrich_language(self, enriched, scraped, old, changes):
+        new_val = scraped.get("Language")
+        if not self.is_val_empty(new_val) and self.is_val_empty(old.get("Language")):
+            enriched["Language"] = new_val
+            changes.append({"field": "Language", "old_value": old.get("Language"),
+                            "new_value": new_val, "status": "changed"})
+
+    def _enrich_ai_tool(self, enriched, scraped, old, changes):
+        new_val = scraped.get("PrimaryAITool")
+        if not self.is_val_empty(new_val) and self.is_val_empty(old.get("PrimaryAITool")):
+            enriched["PrimaryAITool"] = new_val
+            changes.append({"field": "PrimaryAITool", "old_value": old.get("PrimaryAITool"),
+                            "new_value": new_val, "status": "changed"})
+
+    def _enrich_sample_url(self, enriched, scraped, old, changes):
+        new_val = scraped.get("SampleContentURL")
+        if not self.is_val_empty(new_val) and self.is_val_empty(old.get("SampleContentURL")):
+            enriched["SampleContentURL"] = new_val
+            changes.append({"field": "SampleContentURL", "old_value": old.get("SampleContentURL"),
+                            "new_value": new_val, "status": "changed"})
+
+    def _enrich_feed_url(self, enriched, scraped, old, changes):
+        new_val = scraped.get("FeedURL")
+        if not self.is_val_empty(new_val) and self.is_val_empty(old.get("FeedURL")):
+            enriched["FeedURL"] = new_val
+            changes.append({"field": "FeedURL", "old_value": old.get("FeedURL"),
+                            "new_value": new_val, "status": "changed"})
+
+    def _enrich_contact_url(self, enriched, scraped, old, changes):
+        new_val = scraped.get("ContactSourceURL")
+        if not self.is_val_empty(new_val) and self.is_val_empty(old.get("ContactSourceURL")):
+            enriched["ContactSourceURL"] = new_val
+            changes.append({"field": "ContactSourceURL", "old_value": old.get("ContactSourceURL"),
+                            "new_value": new_val, "status": "changed"})
+
+    def _enrich_aigc_verdict(self, enriched, scraped, old, changes):
+        new_val = scraped.get("AIGCVerdict")
+        if not self.is_val_empty(new_val) and self.is_val_empty(old.get("AIGCVerdict")):
+            enriched["AIGCVerdict"] = new_val
+            changes.append({"field": "AIGCVerdict", "old_value": old.get("AIGCVerdict"),
+                            "new_value": new_val, "status": "changed"})
+
+    def _enrich_notes(self, enriched, scraped, old, changes):
+        # Notes are NEVER erased by scraping — preserve human-written notes
+        # Only fill if existing notes are completely empty
+        new_notes = scraped.get("Notes")
+        if not self.is_val_empty(new_notes) and self.is_val_empty(old.get("Notes")):
+            enriched["Notes"] = new_notes
+            changes.append({"field": "Notes", "old_value": old.get("Notes"),
+                            "new_value": new_notes, "status": "changed"})
+
+    def _enrich_evidence_json(self, enriched, scraped, old, changes):
+        new_evidence = scraped.get("EvidenceJSON")
+        if not self.is_val_empty(new_evidence):
+            existing_evidence = str(old.get("EvidenceJSON", "")).strip()
+            if self.is_val_empty(existing_evidence):
+                enriched["EvidenceJSON"] = new_evidence
+                changes.append({"field": "EvidenceJSON", "old_value": old.get("EvidenceJSON"),
+                                "new_value": new_evidence, "status": "changed"})
+            else:
+                # Merge: try to combine evidence objects
+                try:
+                    existing_json = json.loads(existing_evidence) if existing_evidence else {}
+                    new_json = json.loads(str(new_evidence))
+                    if isinstance(existing_json, dict) and isinstance(new_json, dict):
+                        merged = {**existing_json, **new_json}
+                        merged_str = json.dumps(merged, ensure_ascii=False)
+                        if merged_str != existing_evidence:
+                            enriched["EvidenceJSON"] = merged_str
+                            changes.append({"field": "EvidenceJSON", "old_value": old.get("EvidenceJSON"),
+                                            "new_value": merged_str, "status": "changed"})
+                except (json_mod.JSONDecodeError, TypeError):
+                    pass  # Preserve existing valid JSON
+
+    @staticmethod
+    def _now_utc() -> str:
+        from datetime import datetime, timezone
+        return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    @staticmethod
+    def is_discovery_only(result_dict: dict) -> bool:
+        """Check if a record is discovery-only (missing follower/bio data)."""
+        status = str(result_dict.get("ScrapeStatus", result_dict.get("OutreachStatus", ""))).strip().lower()
+        if status == "discovery-only":
+            return True
+        follower = str(result_dict.get("FollowerCount", "")).strip()
+        bio_preview = str(result_dict.get("Notes", "")).strip()
+        if not follower or follower in ("", "None", "nan", "NaN") or "discovery" in bio_preview.lower():
+            return True
+        return False
